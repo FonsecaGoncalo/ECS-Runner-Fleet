@@ -1,0 +1,13 @@
+name: ECS Runner Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-on-ecs:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run sample job
+        run: echo "Hello from ECS self-hosted runner"
