@@ -69,5 +69,6 @@ Example usage:
 python ecsrunner_cli.py runners list
 python ecsrunner_cli.py runners details <runner_id>
 python ecsrunner_cli.py cluster status <cluster>
+python ecsrunner_cli.py runs list --runner-id <runner_id>
 ```
 

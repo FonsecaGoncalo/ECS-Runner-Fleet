@@ -246,5 +246,60 @@ def cluster_status(cluster_name):
     click.echo(_format_table(tasks, columns, stylers))
 
 
+# Runs commands ----------------------------------------------------------
+
+@cli.group()
+def runs():
+    """Commands related to runner job history."""
+    pass
+
+
+@runs.command("list")
+@click.option("--runner-id", help="Filter by runner id")
+def list_runs(runner_id):
+    """List recorded workflow runs."""
+    table = _get_table()
+    items = []
+    try:
+        from boto3.dynamodb.conditions import Key, Attr
+
+        if runner_id:
+            resp = table.query(
+                KeyConditionExpression=Key("runner_id").eq(runner_id)
+                & Key("item_id").begins_with("run#")
+            )
+            items.extend(resp.get("Items", []))
+            while resp.get("LastEvaluatedKey"):
+                resp = table.query(
+                    KeyConditionExpression=Key("runner_id").eq(runner_id)
+                    & Key("item_id").begins_with("run#"),
+                    ExclusiveStartKey=resp["LastEvaluatedKey"],
+                )
+                items.extend(resp.get("Items", []))
+        else:
+            resp = table.scan(FilterExpression=Attr("item_id").begins_with("run#"))
+            items.extend(resp.get("Items", []))
+            while resp.get("LastEvaluatedKey"):
+                resp = table.scan(
+                    FilterExpression=Attr("item_id").begins_with("run#"),
+                    ExclusiveStartKey=resp["LastEvaluatedKey"],
+                )
+                items.extend(resp.get("Items", []))
+    except ClientError as e:
+        raise click.ClickException(str(e))
+
+    columns = [
+        ("RUNNER_ID", "runner_id"),
+        ("RUN_ID", "run_id"),
+        ("REPOSITORY", "repository"),
+        ("WORKFLOW", "workflow"),
+        ("JOB", "job"),
+        ("STARTED", "started_at"),
+        ("COMPLETED", "completed_at"),
+    ]
+
+    click.echo(_format_table(items, columns))
+
+
 if __name__ == "__main__":
     cli()

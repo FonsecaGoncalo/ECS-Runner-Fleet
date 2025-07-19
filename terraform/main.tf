@@ -47,7 +47,7 @@ variable "runner_image" {
 
 variable "runner_image_tag" {
   type        = string
-  default     = "12.0"
+  default     = "12.1"
   description = "Tag used when building and pushing the runner image"
 }
 
@@ -65,9 +65,15 @@ resource "aws_dynamodb_table" "runner_status" {
   name         = "runner-status"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "runner_id"
+  range_key    = "item_id"
 
   attribute {
     name = "runner_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "item_id"
     type = "S"
   }
 }
@@ -246,7 +252,7 @@ resource "aws_iam_role_policy" "task_dynamodb" {
       {
         Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
         Effect   = "Allow"
-        Resource = aws_dynamodb_table.runner_status.arn
+        Resource = [aws_dynamodb_table.runner_status.arn]
       }
     ]
   })
