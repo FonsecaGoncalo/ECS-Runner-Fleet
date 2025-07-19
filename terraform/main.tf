@@ -124,6 +124,7 @@ resource "aws_lambda_function" "control_plane" {
       # SECURITY_GROUPS = join(",", var.security_groups)
        SECURITY_GROUPS = join(",", [aws_security_group.ecs_tasks_sg.id])
       GITHUB_PAT            = var.github_pat
+      GITHUB_REPO            = "FonsecaGoncalo/ECS-Runner-Fleet"
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
     }
   }
