@@ -84,6 +84,7 @@ def lambda_handler(event, context):
         launchType="FARGATE",
         taskDefinition=TASK_DEFINITION,
         count=1,
+        enableExecuteCommand=True,
         overrides={
             "containerOverrides": [
                 {

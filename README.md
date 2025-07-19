@@ -48,3 +48,21 @@ This solution delivers a robust, scalable, and efficient GitHub Actions runner i
 4. The output includes `webhook_url` which should be configured as a GitHub webhook pointing to `POST /webhook`.
 
 The Lambda function in `lambda/control_plane.py` now inspects incoming webhook events and only starts a runner when a `workflow_job` event with the `queued` action is received. The task launched registers as a self-hosted runner using the official GitHub image.
+
+ECS Exec is enabled when launching the runner tasks. The task execution role
+must have the `AmazonSSMManagedInstanceCore` policy attached (included in the
+Terraform configuration) so that the `ecsrunner_cli.py runners exec` command can
+open an interactive shell inside a running task.
+
+## CLI Utility
+
+This repository also provides `ecsrunner_cli.py`, a small command-line tool for inspecting and managing runners. The DynamoDB table name must be supplied via the `RUNNER_STATE_TABLE` environment variable.
+
+Example usage:
+
+```bash
+python ecsrunner_cli.py runners list
+python ecsrunner_cli.py runners details <runner_id>
+python ecsrunner_cli.py cluster status <cluster>
+```
+
