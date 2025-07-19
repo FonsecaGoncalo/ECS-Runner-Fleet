@@ -23,7 +23,7 @@ COPY runner_status.py /home/runner/runner_status.py
 COPY job_started.sh /home/runner/job_started.sh
 COPY job_completed.sh /home/runner/job_completed.sh
 RUN chmod +x /home/runner/entrypoint.sh && chown runner:runner /home/runner/entrypoint.sh
-RUN chmod +x /home/runner/job_started.sh /home/runner/job_completed.sh && \
+RUN chmod +x /home/runner/runner_status.py /home/runner/job_started.sh /home/runner/job_completed.sh && \
     chown runner:runner /home/runner/runner_status.py /home/runner/job_started.sh /home/runner/job_completed.sh
 
 USER runner
