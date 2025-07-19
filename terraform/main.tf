@@ -47,7 +47,7 @@ variable "runner_image" {
 
 variable "runner_image_tag" {
   type        = string
-  default     = "9283sd"
+  default     = "12.0"
   description = "Tag used when building and pushing the runner image"
 }
 

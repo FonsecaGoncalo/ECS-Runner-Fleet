@@ -14,7 +14,13 @@ fi
     --name "${RUNNER_NAME:-fargate-runner}"
 
 # unique id for this runner
-export RUNNER_ID="${RUNNER_NAME:-fargate-runner}-$(hostname)"
+if [ -n "$ECS_CONTAINER_METADATA_URI_V4" ]; then
+  TASK_ARN=$(curl -s "$ECS_CONTAINER_METADATA_URI_V4/task" | jq -r '.TaskARN')
+  TASK_ID=${TASK_ARN##*/}
+  export RUNNER_ID="${RUNNER_NAME:-fargate-runner}-${TASK_ID}"
+else
+  export RUNNER_ID="${RUNNER_NAME:-fargate-runner}-$(hostname)"
+fi
 
 # mark runner initially idle in DynamoDB
 [ -n "$RUNNER_TABLE" ] && /home/runner/runner_status.py idle || true
