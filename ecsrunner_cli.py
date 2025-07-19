@@ -1,17 +1,14 @@
 """Command line tool to manage ECS-based GitHub Actions runners."""
 
-import json
 import os
-import subprocess
 import shutil
+import subprocess
 from typing import Callable, Dict
 
 import boto3
 import click
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import ClientError
 
-
-# Utilities ---------------------------------------------------------------
 
 def _get_table():
     """Return DynamoDB table for runner state."""
@@ -28,9 +25,9 @@ def _ecs_client():
 
 
 def _format_table(
-    items,
-    columns,
-    stylers: Dict[str, Callable[[str], str]] | None = None,
+        items,
+        columns,
+        stylers: Dict[str, Callable[[str], str]] | None = None,
 ):
     """Return a simple table string for a list of dicts.
 
@@ -234,6 +231,7 @@ def cluster_status(cluster_name):
         ("DESIRED", "desiredStatus"),
         ("LAST", "lastStatus"),
     ]
+
     def color_task_status(text: str) -> str:
         raw = text.strip()
         color = {
