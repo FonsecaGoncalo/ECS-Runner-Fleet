@@ -47,7 +47,7 @@ variable "runner_image" {
 
 variable "runner_image_tag" {
   type        = string
-  default     = "latest"
+  default     = "fesfe"
   description = "Tag used when building and pushing the runner image"
 }
 
@@ -156,7 +156,7 @@ resource "null_resource" "build_runner_image" {
   provisioner "local-exec" {
     command     = <<EOT
     aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.runner.repository_url}
-    docker build -t ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag} ..
+    docker build --platform linux/amd64 -t ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag} ..
     docker push ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}
     EOT
     interpreter = ["bash", "-c"]

@@ -4,9 +4,10 @@
 GITHUB_PAT="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"
 GITHUB_REPO="FonsecaGoncalo/ECS-Runner-Fleet"
 IMAGE_NAME="ecs-github-runner"
+IMAGE_TAG="latest"
 
 # Build Docker Image
-docker build -t ${IMAGE_NAME} .
+docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
 
 # Generate Runner Token
 RUNNER_TOKEN=$(curl -X POST \
@@ -22,4 +23,4 @@ docker run \
   -e RUNNER_REPOSITORY_URL="https://github.com/${GITHUB_REPO}" \
   -e RUNNER_TOKEN="${RUNNER_TOKEN}" \
   -e RUNNER_LABELS="default-runner" \
-  ${IMAGE_NAME}:latest
+  ${IMAGE_NAME}:${IMAGE_TAG}

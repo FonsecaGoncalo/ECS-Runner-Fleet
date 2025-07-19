@@ -37,7 +37,9 @@ This solution delivers a robust, scalable, and efficient GitHub Actions runner i
 ## Getting Started
 
 1. Ensure Terraform is installed and AWS credentials are configured.
-2. Update the variables in `terraform/main.tf` or create a `terraform.tfvars` file with your values.
+2. Update the variables in `terraform/main.tf` or create a `terraform.tfvars` file with your values. You can specify
+   `runner_image_tag` to control which Docker image tag is built and pushed to ECR. The image will
+   automatically rebuild and push whenever the Dockerfile or tag changes.
 3. From the `terraform` directory, run:
    ```bash
    terraform init
