@@ -47,7 +47,7 @@ variable "runner_image" {
 
 variable "runner_image_tag" {
   type        = string
-  default     = "fesfe"
+  default     = "mbkmflcda"
   description = "Tag used when building and pushing the runner image"
 }
 
@@ -59,6 +59,17 @@ variable "subnet_ids" {
 variable "security_groups" {
   type    = list(string)
   default = []
+}
+
+resource "aws_dynamodb_table" "runner_status" {
+  name         = "runner-status"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "runner_id"
+
+  attribute {
+    name = "runner_id"
+    type = "S"
+  }
 }
 
 locals {
@@ -103,6 +114,14 @@ data "aws_iam_policy_document" "lambda_policy" {
     ]
     resources = ["*"]
   }
+
+  statement {
+    actions = [
+      "dynamodb:Query",
+      "dynamodb:Scan"
+    ]
+    resources = [aws_dynamodb_table.runner_status.arn]
+  }
 }
 
 resource "aws_lambda_permission" "allow_apigw" {
@@ -132,6 +151,7 @@ resource "aws_lambda_function" "control_plane" {
       GITHUB_PAT            = var.github_pat
       GITHUB_REPO           = "FonsecaGoncalo/ECS-Runner-Fleet"
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
+      RUNNER_TABLE         = aws_dynamodb_table.runner_status.name
     }
   }
 }
@@ -190,7 +210,10 @@ resource "aws_ecs_task_definition" "runner_task" {
       memory    = 2048
       essential = true
       environment = [
-        { name = "GITHUB_REPO", value = var.github_repo }
+        { name = "GITHUB_REPO", value = var.github_repo },
+        { name = "RUNNER_TABLE", value = aws_dynamodb_table.runner_status.name },
+        { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
+        { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
       ],
       logConfiguration = {
         logDriver = "awslogs"
@@ -212,6 +235,21 @@ resource "aws_iam_role" "task_execution" {
 resource "aws_iam_role" "task" {
   name               = "runner-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_trust.json
+}
+
+resource "aws_iam_role_policy" "task_dynamodb" {
+  name = "task-dynamodb"
+  role = aws_iam_role.task.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
+        Effect   = "Allow"
+        Resource = aws_dynamodb_table.runner_status.arn
+      }
+    ]
+  })
 }
 
 data "aws_iam_policy_document" "ecs_task_trust" {

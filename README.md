@@ -24,7 +24,7 @@ This project establishes an automated, scalable solution to deploy GitHub Action
 6. ECS tasks provisioned dynamically register as GitHub self-hosted runners, execute the assigned workflow jobs, and gracefully terminate upon job completion.
 
 ## Security & Observability
-- Webhook validation and security handled at API Gateway.
+- Webhook requests are validated in the Lambda function using the configured webhook secret.
 - IAM policies strictly scoped for minimal permissions.
 - ECS tasks configured for automatic deregistration and termination upon task completion.
 - Detailed logging and monitoring via AWS CloudWatch for operational insights and troubleshooting.

@@ -1,7 +1,8 @@
 FROM ubuntu:22.04
 
 RUN apt-get update && \
-    apt-get install -y curl tar jq git sudo && \
+    apt-get install -y curl tar jq git sudo python3 python3-pip && \
+    pip3 install boto3 && \
     useradd -m runner && \
     rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +19,12 @@ RUN ./bin/installdependencies.sh
 
 # Entry point script
 COPY entrypoint.sh /home/runner/entrypoint.sh
+COPY runner_status.py /home/runner/runner_status.py
+COPY job_started.sh /home/runner/job_started.sh
+COPY job_completed.sh /home/runner/job_completed.sh
 RUN chmod +x /home/runner/entrypoint.sh && chown runner:runner /home/runner/entrypoint.sh
+RUN chmod +x /home/runner/job_started.sh /home/runner/job_completed.sh && \
+    chown runner:runner /home/runner/runner_status.py /home/runner/job_started.sh /home/runner/job_completed.sh
 
 USER runner
 

@@ -13,8 +13,15 @@ fi
     --labels "${RUNNER_LABELS:-ecs-fargate}" \
     --name "${RUNNER_NAME:-fargate-runner}"
 
+# unique id for this runner
+export RUNNER_ID="${RUNNER_NAME:-fargate-runner}-$(hostname)"
+
+# mark runner initially idle in DynamoDB
+[ -n "$RUNNER_TABLE" ] && /home/runner/runner_status.py idle || true
+
 cleanup() {
     echo "Removing runner..."
+    [ -n "$RUNNER_TABLE" ] && /home/runner/runner_status.py offline || true
     ./config.sh remove --unattended --token "$RUNNER_TOKEN"
 }
 
