@@ -42,21 +42,27 @@ variable "github_repo" {
 variable "runner_image" {
   type    = string
   default = ""
-  # default = "ghcr.io/actions/actions-runner:latest"
+  # Optionally specify a fully qualified container image to use
+}
+
+variable "runner_image_tag" {
+  type        = string
+  default     = "latest"
+  description = "Tag used when building and pushing the runner image"
 }
 
 variable "subnet_ids" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 
 variable "security_groups" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 
 locals {
-  runner_image = var.runner_image != "" ? var.runner_image : "${aws_ecr_repository.runner.repository_url}:latest"
+  runner_image = var.runner_image != "" ? var.runner_image : "${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}"
 }
 
 resource "aws_iam_role" "lambda" {
@@ -68,7 +74,7 @@ data "aws_iam_policy_document" "lambda_trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
-      type = "Service"
+      type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
     }
   }
@@ -117,12 +123,12 @@ resource "aws_lambda_function" "control_plane" {
 
   environment {
     variables = {
-      CLUSTER               = aws_ecs_cluster.runner_cluster.name
+      CLUSTER         = aws_ecs_cluster.runner_cluster.name
       TASK_DEFINITION = aws_ecs_task_definition.runner_task.arn
       # SUBNETS = join(",", var.subnet_ids)
       SUBNETS = join(",", module.vpc.public_subnets)
       # SECURITY_GROUPS = join(",", var.security_groups)
-      SECURITY_GROUPS = join(",", [aws_security_group.ecs_tasks_sg.id])
+      SECURITY_GROUPS       = join(",", [aws_security_group.ecs_tasks_sg.id])
       GITHUB_PAT            = var.github_pat
       GITHUB_REPO           = "FonsecaGoncalo/ECS-Runner-Fleet"
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
@@ -141,11 +147,17 @@ resource "aws_ecr_repository" "runner" {
 }
 
 resource "null_resource" "build_runner_image" {
+  triggers = {
+    # Rebuild if the Dockerfile changes or a new tag is provided
+    dockerfile_sha = filesha1("${path.module}/../Dockerfile")
+    image_tag      = var.runner_image_tag
+  }
+
   provisioner "local-exec" {
-    command = <<EOT
+    command     = <<EOT
     aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.runner.repository_url}
-    docker build -t ${aws_ecr_repository.runner.repository_url}:latest ..
-    docker push ${aws_ecr_repository.runner.repository_url}:latest
+    docker build -t ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag} ..
+    docker push ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}
     EOT
     interpreter = ["bash", "-c"]
   }
@@ -161,14 +173,14 @@ resource "aws_cloudwatch_log_group" "ecs_runner" {
 }
 
 resource "aws_ecs_task_definition" "runner_task" {
-  family             = "github-runner"
+  family                   = "github-runner"
   requires_compatibilities = ["FARGATE"]
-  network_mode       = "awsvpc"
-  cpu                = 1024
-  memory             = 2048
-  execution_role_arn = aws_iam_role.task_execution.arn
-  task_role_arn      = aws_iam_role.task.arn
-  depends_on = [null_resource.build_runner_image]
+  network_mode             = "awsvpc"
+  cpu                      = 1024
+  memory                   = 2048
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+  depends_on               = [null_resource.build_runner_image]
 
   container_definitions = jsonencode([
     {
@@ -206,7 +218,7 @@ data "aws_iam_policy_document" "ecs_task_trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
-      type = "Service"
+      type        = "Service"
       identifiers = ["ecs-tasks.amazonaws.com"]
     }
   }
