@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import shutil
+from typing import Callable, Dict
 
 import boto3
 import click
@@ -24,6 +25,44 @@ def _get_table():
 def _ecs_client():
     """Return boto3 ECS client."""
     return boto3.client("ecs")
+
+
+def _format_table(
+    items,
+    columns,
+    stylers: Dict[str, Callable[[str], str]] | None = None,
+):
+    """Return a simple table string for a list of dicts.
+
+    Parameters
+    ----------
+    items: list of dict
+        Items to render.
+    columns: list of tuple
+        Sequence of ``(header, key)`` column definitions.
+    """
+
+    if not items:
+        headers = [c[0] for c in columns]
+        return "  ".join(click.style(h, bold=True) for h in headers)
+
+    widths = [len(col[0]) for col in columns]
+    for item in items:
+        for idx, (_, key) in enumerate(columns):
+            widths[idx] = max(widths[idx], len(str(item.get(key, ""))))
+
+    header = "  ".join(col[0].ljust(widths[i]) for i, col in enumerate(columns))
+    rows = [click.style(header, bold=True)]
+    for item in items:
+        parts = []
+        for i, (header_name, key) in enumerate(columns):
+            raw = str(item.get(key, ""))
+            padded = raw.ljust(widths[i])
+            if stylers and key in stylers:
+                padded = stylers[key](padded)
+            parts.append(padded)
+        rows.append("  ".join(parts))
+    return "\n".join(rows)
 
 
 # Main CLI group ---------------------------------------------------------
@@ -56,7 +95,26 @@ def list_runners():
     except ClientError as e:
         raise click.ClickException(str(e))
 
-    click.echo(json.dumps(items, indent=2, default=str))
+    columns = [
+        ("RUNNER_ID", "runner_id"),
+        ("STATUS", "status"),
+        ("JOB_ID", "workflow_job_id"),
+        ("STARTED", "started_at"),
+        ("COMPLETED", "completed_at"),
+    ]
+
+    def color_status(text: str) -> str:
+        raw = text.strip()
+        color = {
+            "running": "green",
+            "idle": "yellow",
+            "stopped": "red",
+        }.get(raw.lower())
+        return click.style(text, fg=color) if color else text
+
+    stylers = {"status": color_status}
+
+    click.echo(_format_table(items, columns, stylers))
 
 
 @runners.command("details")
@@ -72,7 +130,9 @@ def runner_details(runner_id):
     item = resp.get("Item")
     if not item:
         raise click.ClickException("Runner not found")
-    click.echo(json.dumps(item, indent=2, default=str))
+
+    for key in sorted(item):
+        click.echo(f"{key}: {item[key]}")
 
 
 @runners.command("terminate")
@@ -155,7 +215,7 @@ def cluster_status(cluster_name):
         resp = ecs.list_tasks(cluster=cluster_name)
         arns = resp.get("taskArns", [])
         if not arns:
-            click.echo(json.dumps([], indent=2))
+            click.echo("No tasks found")
             return
         details = ecs.describe_tasks(cluster=cluster_name, tasks=arns)
         tasks = [
@@ -169,7 +229,23 @@ def cluster_status(cluster_name):
     except ClientError as e:
         raise click.ClickException(str(e))
 
-    click.echo(json.dumps(tasks, indent=2))
+    columns = [
+        ("TASK_ARN", "taskArn"),
+        ("DESIRED", "desiredStatus"),
+        ("LAST", "lastStatus"),
+    ]
+    def color_task_status(text: str) -> str:
+        raw = text.strip()
+        color = {
+            "running": "green",
+            "pending": "yellow",
+            "stopped": "red",
+        }.get(raw.lower())
+        return click.style(text, fg=color) if color else text
+
+    stylers = {"desiredStatus": color_task_status, "lastStatus": color_task_status}
+
+    click.echo(_format_table(tasks, columns, stylers))
 
 
 if __name__ == "__main__":
