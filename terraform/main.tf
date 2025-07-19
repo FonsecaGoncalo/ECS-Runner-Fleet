@@ -122,9 +122,9 @@ resource "aws_lambda_function" "control_plane" {
       # SUBNETS = join(",", var.subnet_ids)
       SUBNETS = join(",", module.vpc.public_subnets)
       # SECURITY_GROUPS = join(",", var.security_groups)
-       SECURITY_GROUPS = join(",", [aws_security_group.ecs_tasks_sg.id])
+      SECURITY_GROUPS = join(",", [aws_security_group.ecs_tasks_sg.id])
       GITHUB_PAT            = var.github_pat
-      GITHUB_REPO            = "FonsecaGoncalo/ECS-Runner-Fleet"
+      GITHUB_REPO           = "FonsecaGoncalo/ECS-Runner-Fleet"
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
     }
   }
@@ -155,6 +155,11 @@ resource "aws_ecs_cluster" "runner_cluster" {
   name = "runner-cluster"
 }
 
+resource "aws_cloudwatch_log_group" "ecs_runner" {
+  name              = "/ecs/github-runner"
+  retention_in_days = 7
+}
+
 resource "aws_ecs_task_definition" "runner_task" {
   family             = "github-runner"
   requires_compatibilities = ["FARGATE"]
@@ -174,7 +179,15 @@ resource "aws_ecs_task_definition" "runner_task" {
       essential = true
       environment = [
         { name = "GITHUB_REPO", value = var.github_repo }
-      ]
+      ],
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs_runner.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "runner"
+        }
+      }
     }
   ])
 }
