@@ -7,11 +7,11 @@ RUN apt-get update && \
 
 WORKDIR /home/runner
 
-# Download ARM64-specific GitHub Actions runner
+# Download x86_64 GitHub Actions runner
 RUN RUNNER_VERSION=$(curl -s https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name' | sed 's/v//') && \
-    curl -o actions-runner-linux-arm64.tar.gz -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz" && \
-    tar xzf actions-runner-linux-arm64.tar.gz && \
-    rm actions-runner-linux-arm64.tar.gz
+    curl -o actions-runner-linux-x64.tar.gz -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" && \
+    tar xzf actions-runner-linux-x64.tar.gz && \
+    rm actions-runner-linux-x64.tar.gz
 
 # Install dependencies as root
 RUN ./bin/installdependencies.sh
