@@ -54,6 +54,11 @@ must have the `AmazonSSMManagedInstanceCore` policy attached (included in the
 Terraform configuration) so that the `ecsrunner_cli.py runners exec` command can
 open an interactive shell inside a running task.
 
+The local machine running the CLI must also have the AWS Session Manager plugin
+installed. Follow the instructions in the [Session Manager
+documentation](https://docs.aws.amazon.com/console/systems-manager/session-manager-plugin-not-found)
+if you encounter a "SessionManagerPlugin is not found" error.
+
 ## CLI Utility
 
 This repository also provides `ecsrunner_cli.py`, a small command-line tool for inspecting and managing runners. The DynamoDB table name must be supplied via the `RUNNER_STATE_TABLE` environment variable.

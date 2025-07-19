@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import shutil
 
 import boto3
 import click
@@ -111,6 +112,11 @@ def mark_idle(runner_id):
 @click.option("--cmd", default="/bin/bash", show_default=True, help="Command to execute")
 def exec_runner(cluster_name, task_id, container_name, cmd):
     """Open an interactive shell into a running ECS task."""
+    if shutil.which("session-manager-plugin") is None:
+        raise click.ClickException(
+            "Session Manager plugin not found. "
+            "See https://docs.aws.amazon.com/console/systems-manager/session-manager-plugin-not-found"
+        )
     command = [
         "aws",
         "ecs",
