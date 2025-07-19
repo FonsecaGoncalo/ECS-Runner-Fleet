@@ -47,4 +47,4 @@ This solution delivers a robust, scalable, and efficient GitHub Actions runner i
    ```
 4. The output includes `webhook_url` which should be configured as a GitHub webhook pointing to `POST /webhook`.
 
-The Lambda function in `lambda/control_plane.py` launches ephemeral ECS Fargate tasks that register as self-hosted runners using the official GitHub runner image.
+The Lambda function in `lambda/control_plane.py` now inspects incoming webhook events and only starts a runner when a `workflow_job` event with the `queued` action is received. The task launched registers as a self-hosted runner using the official GitHub image.

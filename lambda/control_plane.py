@@ -29,6 +29,23 @@ def get_runner_token(repo, pat):
 
 def lambda_handler(event, context):
     print("Received event:", json.dumps(event))
+
+    body = event.get("body")
+    if not body:
+        print("No body in event")
+        return {"statusCode": 400, "body": "no event body"}
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        print("Invalid JSON payload")
+        return {"statusCode": 400, "body": "invalid json"}
+
+    action = payload.get("action")
+    if action != "queued" or "workflow_job" not in payload:
+        print(f"Ignoring action: {action}")
+        return {"statusCode": 200, "body": "ignored"}
+
     token = get_runner_token(GITHUB_REPO, GITHUB_PAT)
     response = ecs.run_task(
         cluster=CLUSTER,
