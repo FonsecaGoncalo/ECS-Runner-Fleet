@@ -1,0 +1,25 @@
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    apt-get install -y curl tar jq git sudo && \
+    useradd -m runner && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/runner
+
+# Download ARM64-specific GitHub Actions runner
+RUN RUNNER_VERSION=$(curl -s https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name' | sed 's/v//') && \
+    curl -o actions-runner-linux-arm64.tar.gz -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz" && \
+    tar xzf actions-runner-linux-arm64.tar.gz && \
+    rm actions-runner-linux-arm64.tar.gz
+
+# Install dependencies as root
+RUN ./bin/installdependencies.sh
+
+# Entry point script
+COPY entrypoint.sh /home/runner/entrypoint.sh
+RUN chmod +x /home/runner/entrypoint.sh && chown runner:runner /home/runner/entrypoint.sh
+
+USER runner
+
+ENTRYPOINT ["/home/runner/entrypoint.sh"]
