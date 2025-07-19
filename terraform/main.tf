@@ -99,6 +99,14 @@ data "aws_iam_policy_document" "lambda_policy" {
   }
 }
 
+resource "aws_lambda_permission" "allow_apigw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.control_plane.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.webhook_api.execution_arn}/*/*"
+}
+
 resource "aws_lambda_function" "control_plane" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = "runner-control-plane"
@@ -110,9 +118,11 @@ resource "aws_lambda_function" "control_plane" {
   environment {
     variables = {
       CLUSTER               = aws_ecs_cluster.runner_cluster.name
-      TASK_DEFINITION       = aws_ecs_task_definition.runner_task.arn
-      SUBNETS = join(",", var.subnet_ids)
-      SECURITY_GROUPS = join(",", var.security_groups)
+      TASK_DEFINITION = aws_ecs_task_definition.runner_task.arn
+      # SUBNETS = join(",", var.subnet_ids)
+      SUBNETS = join(",", module.vpc.public_subnets)
+      # SECURITY_GROUPS = join(",", var.security_groups)
+       SECURITY_GROUPS = join(",", [aws_security_group.ecs_tasks_sg.id])
       GITHUB_PAT            = var.github_pat
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
     }
