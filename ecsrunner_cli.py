@@ -24,6 +24,19 @@ def _ecs_client():
     return boto3.client("ecs")
 
 
+def _get_class_sizes():
+    """Return dict of runner class sizes from SSM."""
+    param_name = os.environ.get("CLASS_SIZES_PARAM")
+    if not param_name:
+        raise click.ClickException("CLASS_SIZES_PARAM environment variable is not set")
+    ssm = boto3.client("ssm")
+    try:
+        resp = ssm.get_parameter(Name=param_name)
+        return json.loads(resp["Parameter"]["Value"])
+    except ClientError as e:
+        raise click.ClickException(str(e))
+
+
 def _format_table(
         items,
         columns,
@@ -68,6 +81,15 @@ def _format_table(
 def cli():
     """Manage GitHub Actions runners on ECS."""
     pass
+
+
+@cli.command("list-class-sizes")
+def list_class_sizes():
+    """List available runner class sizes."""
+    sizes = _get_class_sizes()
+    items = [{"class": name, **vals} for name, vals in sizes.items()]
+    columns = [("CLASS", "class"), ("CPU", "cpu"), ("MEMORY", "memory")]
+    click.echo(_format_table(items, columns))
 
 
 # Runner commands --------------------------------------------------------

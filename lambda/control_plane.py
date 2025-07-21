@@ -9,6 +9,7 @@ import urllib.request
 
 ecs = boto3.client("ecs")
 dynamodb = boto3.resource("dynamodb")
+ssm = boto3.client("ssm")
 
 CLUSTER = os.environ.get("CLUSTER", "runner-cluster")
 TASK_DEFINITION = os.environ["TASK_DEFINITION"]
@@ -18,6 +19,24 @@ GITHUB_PAT = os.environ.get("GITHUB_PAT")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
 WEBHOOK_SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET")
 RUNNER_TABLE = os.environ.get("RUNNER_TABLE")
+CLASS_SIZES_PARAM = os.environ.get("CLASS_SIZES_PARAM")
+
+_class_sizes = None
+
+def get_class_sizes():
+    global _class_sizes
+    if _class_sizes is not None:
+        return _class_sizes
+    if not CLASS_SIZES_PARAM:
+        _class_sizes = {}
+        return _class_sizes
+    try:
+        resp = ssm.get_parameter(Name=CLASS_SIZES_PARAM)
+        _class_sizes = json.loads(resp["Parameter"]["Value"])
+    except Exception as exc:
+        print(f"Failed to load class sizes: {exc}")
+        _class_sizes = {}
+    return _class_sizes
 
 
 def get_runner_token(repo, pat):
@@ -36,6 +55,10 @@ def get_runner_token(repo, pat):
 
 def lambda_handler(event, context):
     print("Received event:", json.dumps(event))
+
+    sizes = get_class_sizes()
+    if sizes:
+        print("Available class sizes:", sizes)
 
     body = event.get("body")
     if body is None:
@@ -79,29 +102,50 @@ def lambda_handler(event, context):
             return {"statusCode": 200, "body": "runner available"}
 
     token = get_runner_token(GITHUB_REPO, GITHUB_PAT)
+
+    job = payload.get("workflow_job", {})
+    job_labels = job.get("labels", [])
+    runner_labels = ",".join(job_labels) if job_labels else "default-runner"
+    class_name = None
+    for lbl in job_labels:
+        if lbl.startswith("class:"):
+            class_name = lbl.split(":", 1)[1]
+            break
+
+    overrides = {
+        "containerOverrides": [
+            {
+                "name": "runner",
+                "environment": [
+                    {
+                        "name": "RUNNER_REPOSITORY_URL",
+                        "value": f"https://github.com/{GITHUB_REPO}",
+                    },
+                    {"name": "RUNNER_TOKEN", "value": token},
+                    {"name": "RUNNER_LABELS", "value": runner_labels},
+                    {"name": "RUNNER_NAME", "value": "my-runner"},
+                    {"name": "RUNNER_TABLE", "value": RUNNER_TABLE or ""},
+                ],
+            }
+        ]
+    }
+
+    if class_name and class_name in sizes:
+        cpu = sizes[class_name].get("cpu")
+        memory = sizes[class_name].get("memory")
+        overrides["cpu"] = str(cpu)
+        overrides["memory"] = str(memory)
+        overrides["containerOverrides"][0]["cpu"] = cpu
+        overrides["containerOverrides"][0]["memory"] = memory
+        print(f"Using class {class_name}: cpu={cpu} memory={memory}")
+
     response = ecs.run_task(
         cluster=CLUSTER,
         launchType="FARGATE",
         taskDefinition=TASK_DEFINITION,
         count=1,
         enableExecuteCommand=True,
-        overrides={
-            "containerOverrides": [
-                {
-                    "name": "runner",
-                    "environment": [
-                        {
-                            "name": "RUNNER_REPOSITORY_URL",
-                            "value": f"https://github.com/{GITHUB_REPO}",
-                        },
-                        {"name": "RUNNER_TOKEN", "value": token},
-                        {"name": "RUNNER_LABELS", "value": "default-runner"},
-                        {"name": "RUNNER_NAME", "value": "my-runner"},
-                        {"name": "RUNNER_TABLE", "value": RUNNER_TABLE or ""},
-                    ],
-                }
-            ]
-        },
+        overrides=overrides,
         networkConfiguration={
             "awsvpcConfiguration": {
                 "subnets": SUBNETS,

@@ -40,6 +40,9 @@ This solution delivers a robust, scalable, and efficient GitHub Actions runner i
 2. Update the variables in `terraform/main.tf` or create a `terraform.tfvars` file with your values. You can specify
    `runner_image_tag` to control which Docker image tag is built and pushed to ECR. The image will
    automatically rebuild and push whenever the Dockerfile or tag changes.
+   The `runner_class_sizes` variable defines available runner sizes and is stored
+   in SSM for the control plane Lambda and CLI. Include a `class:<name>` label in
+   your workflow job to launch a runner with the corresponding size.
 3. From the `terraform` directory, run:
    ```bash
    terraform init
@@ -69,6 +72,7 @@ Example usage:
 python ecsrunner_cli.py runners list
 python ecsrunner_cli.py runners details <runner_id>
 python ecsrunner_cli.py cluster status <cluster>
+python ecsrunner_cli.py list-class-sizes
 python ecsrunner_cli.py runs list --runner-id <runner_id>
 ```
 

@@ -61,6 +61,28 @@ variable "security_groups" {
   default = []
 }
 
+variable "runner_class_sizes" {
+  description = "Map of runner class sizes and their cpu/memory settings"
+  type = map(object({
+    cpu    = number
+    memory = number
+  }))
+  default = {
+    small = {
+      cpu    = 512
+      memory = 1024
+    }
+    medium = {
+      cpu    = 1024
+      memory = 2048
+    }
+    large = {
+      cpu    = 2048
+      memory = 4096
+    }
+  }
+}
+
 resource "aws_dynamodb_table" "runner_status" {
   name         = "runner-status"
   billing_mode = "PAY_PER_REQUEST"
@@ -76,6 +98,12 @@ resource "aws_dynamodb_table" "runner_status" {
     name = "item_id"
     type = "S"
   }
+}
+
+resource "aws_ssm_parameter" "class_sizes" {
+  name  = "/ecs-runner/class-sizes"
+  type  = "String"
+  value = jsonencode(var.runner_class_sizes)
 }
 
 locals {
@@ -128,6 +156,11 @@ data "aws_iam_policy_document" "lambda_policy" {
     ]
     resources = [aws_dynamodb_table.runner_status.arn]
   }
+
+  statement {
+    actions   = ["ssm:GetParameter"]
+    resources = [aws_ssm_parameter.class_sizes.arn]
+  }
 }
 
 resource "aws_lambda_permission" "allow_apigw" {
@@ -157,7 +190,8 @@ resource "aws_lambda_function" "control_plane" {
       GITHUB_PAT            = var.github_pat
       GITHUB_REPO           = "FonsecaGoncalo/ECS-Runner-Fleet"
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
-      RUNNER_TABLE         = aws_dynamodb_table.runner_status.name
+      RUNNER_TABLE          = aws_dynamodb_table.runner_status.name
+      CLASS_SIZES_PARAM     = aws_ssm_parameter.class_sizes.name
     }
   }
 }
