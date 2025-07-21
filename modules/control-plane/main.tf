@@ -61,7 +61,9 @@ data "aws_iam_policy_document" "lambda_policy" {
   statement {
     actions = [
       "dynamodb:Query",
-      "dynamodb:Scan"
+      "dynamodb:Scan",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem"
     ]
     resources = [aws_dynamodb_table.runner_status.arn]
   }
