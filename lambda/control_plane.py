@@ -20,6 +20,7 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO")
 WEBHOOK_SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET")
 RUNNER_TABLE = os.environ.get("RUNNER_TABLE")
 CLASS_SIZES_PARAM = os.environ.get("CLASS_SIZES_PARAM")
+LABEL_TASK_DEFINITIONS = json.loads(os.environ.get("LABEL_TASK_DEFINITIONS", "{}"))
 
 _class_sizes = None
 
@@ -106,6 +107,12 @@ def lambda_handler(event, context):
     job = payload.get("workflow_job", {})
     job_labels = job.get("labels", [])
     runner_labels = ",".join(job_labels) if job_labels else "default-runner"
+    task_def = TASK_DEFINITION
+    for lbl in job_labels:
+        if lbl in LABEL_TASK_DEFINITIONS:
+            task_def = LABEL_TASK_DEFINITIONS[lbl]
+            print(f"Using task definition for label {lbl}: {task_def}")
+            break
     class_name = None
     for lbl in job_labels:
         if lbl.startswith("class:"):
@@ -142,7 +149,7 @@ def lambda_handler(event, context):
     response = ecs.run_task(
         cluster=CLUSTER,
         launchType="FARGATE",
-        taskDefinition=TASK_DEFINITION,
+        taskDefinition=task_def,
         count=1,
         enableExecuteCommand=True,
         overrides=overrides,

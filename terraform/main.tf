@@ -51,6 +51,12 @@ variable "runner_image_tag" {
   description = "Tag used when building and pushing the runner image"
 }
 
+variable "extra_runner_images" {
+  description = "Map of additional runner labels to Dockerfile directories"
+  type        = map(string)
+  default     = {}
+}
+
 variable "subnet_ids" {
   type    = list(string)
   default = []
@@ -108,6 +114,7 @@ resource "aws_ssm_parameter" "class_sizes" {
 
 locals {
   runner_image = var.runner_image != "" ? var.runner_image : "${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}"
+  label_images = { for label, _ in var.extra_runner_images : label => "${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}-${label}" }
 }
 
 resource "aws_iam_role" "lambda" {
@@ -181,14 +188,15 @@ resource "aws_lambda_function" "control_plane" {
 
   environment {
     variables = {
-      CLUSTER         = aws_ecs_cluster.runner_cluster.name
-      TASK_DEFINITION = aws_ecs_task_definition.runner_task.arn
+      CLUSTER                = aws_ecs_cluster.runner_cluster.name
+      TASK_DEFINITION        = aws_ecs_task_definition.runner_task.arn
+      LABEL_TASK_DEFINITIONS = jsonencode({ for k, v in aws_ecs_task_definition.runner_task_extra : k => v.arn })
       # SUBNETS = join(",", var.subnet_ids)
       SUBNETS = join(",", module.vpc.public_subnets)
       # SECURITY_GROUPS = join(",", var.security_groups)
       SECURITY_GROUPS       = join(",", [aws_security_group.ecs_tasks_sg.id])
       GITHUB_PAT            = var.github_pat
-      GITHUB_REPO           = "FonsecaGoncalo/ECS-Runner-Fleet"
+      GITHUB_REPO           = var.github_repo
       GITHUB_WEBHOOK_SECRET = var.webhook_secret
       RUNNER_TABLE          = aws_dynamodb_table.runner_status.name
       CLASS_SIZES_PARAM     = aws_ssm_parameter.class_sizes.name
@@ -223,6 +231,27 @@ resource "null_resource" "build_runner_image" {
   }
 }
 
+resource "null_resource" "build_extra_images" {
+  for_each = var.extra_runner_images
+
+  triggers = {
+    dockerfile_sha = filesha1("${path.module}/../${each.value}/Dockerfile")
+    image_tag      = var.runner_image_tag
+  }
+
+  provisioner "local-exec" {
+    command     = <<EOT
+    aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.runner.repository_url}
+    docker build --platform linux/amd64 \
+      --build-arg BASE_IMAGE=${local.runner_image} \
+      -t ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}-${each.key} ../${each.value}
+    docker push ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}-${each.key}
+    EOT
+    interpreter = ["bash", "-c"]
+  }
+  depends_on = [null_resource.build_runner_image]
+}
+
 resource "aws_ecs_cluster" "runner_cluster" {
   name = "runner-cluster"
 }
@@ -255,6 +284,42 @@ resource "aws_ecs_task_definition" "runner_task" {
         { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
         { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
       ],
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs_runner.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "runner"
+        }
+      }
+    }
+  ])
+}
+
+resource "aws_ecs_task_definition" "runner_task_extra" {
+  for_each                 = var.extra_runner_images
+  family                   = "github-runner-${each.key}"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 1024
+  memory                   = 2048
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+  depends_on               = [null_resource.build_extra_images]
+
+  container_definitions = jsonencode([
+    {
+      name      = "runner"
+      image     = local.label_images[each.key]
+      cpu       = 1024
+      memory    = 2048
+      essential = true
+      environment = [
+        { name = "GITHUB_REPO", value = var.github_repo },
+        { name = "RUNNER_TABLE", value = aws_dynamodb_table.runner_status.name },
+        { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
+        { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {

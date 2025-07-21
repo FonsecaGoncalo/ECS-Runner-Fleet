@@ -43,6 +43,10 @@ This solution delivers a robust, scalable, and efficient GitHub Actions runner i
    The `runner_class_sizes` variable defines available runner sizes and is stored
    in SSM for the control plane Lambda and CLI. Include a `class:<name>` label in
    your workflow job to launch a runner with the corresponding size.
+   The `extra_runner_images` variable can map labels to directories containing a
+   `Dockerfile` that extends the base image. Images are built and pushed to ECR
+   with the tag `<runner_image_tag>-<label>` and used when a job includes the
+   matching label.
 3. From the `terraform` directory, run:
    ```bash
    terraform init
