@@ -18,7 +18,7 @@ variable "github_repo" {
 
 variable "runner_image_tag" {
   type        = string
-  default     = "12.1"
+  default     = "12.3"
   description = "Tag used when building and pushing the runner image"
 }
 
@@ -26,12 +26,6 @@ variable "extra_runner_images" {
   description = "Map of additional runner labels to Dockerfile directories"
   type        = map(string)
   default     = {}
-}
-
-variable "event_bus_name" {
-  description = "EventBridge bus name for runner status events"
-  type        = string
-  default     = "default"
 }
 
 variable "subnet_ids" {

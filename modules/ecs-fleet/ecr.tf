@@ -20,7 +20,7 @@ resource "null_resource" "build_base_image" {
   provisioner "local-exec" {
     command     = <<EOT
 aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.runner.repository_url}
-docker build --platform linux/amd64 -t ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag} ${path.root}/runner
+docker build --platform linux/amd64 -t ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag} ${path.module}/../../runner
 docker push ${aws_ecr_repository.runner.repository_url}:${var.runner_image_tag}
 EOT
     interpreter = ["bash", "-c"]
