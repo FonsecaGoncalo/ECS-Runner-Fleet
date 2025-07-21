@@ -2,7 +2,7 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
 
-  name = "runner-fleet"
+  name = "runner-fleet-vpc"
   cidr = "10.0.0.0/16"
 
   azs            = ["eu-west-3a", "eu-west-3b"]
