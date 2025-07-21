@@ -79,7 +79,7 @@ resource "aws_lambda_permission" "allow_apigw" {
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "../lambda"
+  source_dir  = "${path.module}/../../lambda"
   output_path = "../lambda.zip"
 }
 

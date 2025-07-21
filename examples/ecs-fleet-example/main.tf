@@ -21,7 +21,7 @@ module "ecs-fleet" {
   github_repo = "FonsecaGoncalo/ECS-Runner-Fleet"
 
   subnet_ids      = module.vpc.public_subnets
-  security_groups = aws_security_group.ecs_tasks_sg.id
+  security_groups = [aws_security_group.ecs_tasks_sg.id]
   webhook_secret  = "UM8gRCkLe2TB9O0utuyz2aff+EA8v1DQtxhEgG2UDKXjnkxLBoKFrq0fFD9LNYwhIWCZsKKVOsdXq5EFYWwvbg=="
 
   extra_runner_images = {

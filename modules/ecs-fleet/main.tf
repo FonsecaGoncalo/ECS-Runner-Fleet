@@ -15,7 +15,7 @@ resource "aws_ecs_task_definition" "runner_task" {
   memory                   = 2048
   execution_role_arn       = aws_iam_role.task_execution.arn
   task_role_arn            = aws_iam_role.task.arn
-  depends_on               = [null_resource.build_runner_image]
+  depends_on               = [null_resource.build_base_image]
 
   container_definitions = jsonencode([
     {
@@ -51,7 +51,7 @@ resource "aws_ecs_task_definition" "runner_task_extra" {
   memory                   = 2048
   execution_role_arn       = aws_iam_role.task_execution.arn
   task_role_arn            = aws_iam_role.task.arn
-  depends_on               = [null_resource.build_runner_image]
+  depends_on               = [null_resource.build_extra_image]
 
   container_definitions = jsonencode([
     {
