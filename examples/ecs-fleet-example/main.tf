@@ -15,7 +15,7 @@ terraform {
 }
 
 module "ecs-fleet" {
-  source = "./.."
+  source = "./../.."
 
   github_pat  = "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"
   github_repo = "FonsecaGoncalo/ECS-Runner-Fleet"
