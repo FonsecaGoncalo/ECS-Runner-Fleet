@@ -28,6 +28,12 @@ variable "extra_runner_images" {
   default     = {}
 }
 
+variable "event_bus_name" {
+  description = "EventBridge bus name for runner status events"
+  type        = string
+  default     = "default"
+}
+
 variable "subnet_ids" {
   type    = list(string)
   default = []

@@ -6,6 +6,7 @@ import hashlib
 import boto3
 from boto3.dynamodb.conditions import Attr
 import urllib.request
+import time
 
 ecs = boto3.client("ecs")
 dynamodb = boto3.resource("dynamodb")
@@ -54,8 +55,61 @@ def get_runner_token(repo, pat):
     return data["token"]
 
 
+def handle_status_event(detail):
+    if isinstance(detail, str):
+        try:
+            detail = json.loads(detail)
+        except json.JSONDecodeError:
+            detail = {}
+    status = detail.get("status")
+    runner_id = detail.get("runner_id")
+    ts = detail.get("timestamp", int(time.time()))
+    run_key = detail.get("workflow_job_id")
+
+    table = dynamodb.Table(RUNNER_TABLE)
+    state_item = {
+        "runner_id": runner_id,
+        "item_id": "state",
+        "status": status,
+        "timestamp": ts,
+    }
+    if run_key:
+        state_item["workflow_job_id"] = run_key
+
+    if status == "running" and run_key:
+        state_item["started_at"] = ts
+        table.put_item(
+            Item={
+                "runner_id": runner_id,
+                "item_id": f"run#{run_key}",
+                "run_id": run_key,
+                "repository": detail.get("repository"),
+                "workflow": detail.get("workflow"),
+                "job": detail.get("job"),
+                "started_at": ts,
+            }
+        )
+    elif status in ("idle", "offline"):
+        state_item["completed_at"] = ts
+        if run_key:
+            try:
+                table.update_item(
+                    Key={"runner_id": runner_id, "item_id": f"run#{run_key}"},
+                    UpdateExpression="SET completed_at = :ts",
+                    ExpressionAttributeValues={":ts": ts},
+                )
+            except Exception as exc:
+                print(f"Failed to update run record: {exc}")
+
+    table.put_item(Item=state_item)
+
+
 def lambda_handler(event, context):
     print("Received event:", json.dumps(event))
+
+    if event.get("detail-type") == "runner-status":
+        handle_status_event(event.get("detail"))
+        return {"statusCode": 200, "body": "status updated"}
 
     sizes = get_class_sizes()
     if sizes:

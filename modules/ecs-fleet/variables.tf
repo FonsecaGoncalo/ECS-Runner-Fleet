@@ -36,3 +36,9 @@ variable "runner_table_arn" {
   type        = string
   default     = ""
 }
+
+variable "event_bus_name" {
+  description = "Name of the EventBridge bus for runner status events"
+  type        = string
+  default     = "default"
+}

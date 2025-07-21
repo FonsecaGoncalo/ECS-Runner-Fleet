@@ -26,7 +26,7 @@ resource "aws_ecs_task_definition" "runner_task" {
       essential = true
       environment = [
         { name = "GITHUB_REPO", value = var.github_repo },
-        { name = "RUNNER_TABLE", value = var.runner_table_name },
+        { name = "EVENT_BUS_NAME", value = var.event_bus_name },
         { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
         { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
       ],
@@ -62,7 +62,7 @@ resource "aws_ecs_task_definition" "runner_task_extra" {
       essential = true
       environment = [
         { name = "GITHUB_REPO", value = var.github_repo },
-        { name = "RUNNER_TABLE", value = var.runner_table_name },
+        { name = "EVENT_BUS_NAME", value = var.event_bus_name },
         { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
         { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
       ]
@@ -98,16 +98,16 @@ resource "aws_iam_role_policy_attachment" "task_execution_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-resource "aws_iam_role_policy" "task_dynamodb" {
-  name = "task-dynamodb"
+resource "aws_iam_role_policy" "task_events" {
+  name = "task-events"
   role = aws_iam_role.task.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
+        Action   = ["events:PutEvents"]
         Effect   = "Allow"
-        Resource = [var.runner_table_arn]
+        Resource = "*"
       }
     ]
   })

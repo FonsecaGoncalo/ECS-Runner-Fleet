@@ -4,6 +4,7 @@ module "ecs_fleet" {
   github_repo         = var.github_repo
   runner_image_tag    = var.runner_image_tag
   extra_runner_images = var.extra_runner_images
+  event_bus_name      = var.event_bus_name
 }
 
 module "control_plane" {
@@ -17,6 +18,7 @@ module "control_plane" {
   runner_class_sizes         = var.runner_class_sizes
   task_definition_arn        = module.ecs_fleet.task_definition_arn
   label_task_definition_arns = module.ecs_fleet.extra_task_definition_arns
+  event_bus_name             = var.event_bus_name
 }
 
 output "webhook_url" {

@@ -22,12 +22,12 @@ else
   export RUNNER_ID="${RUNNER_NAME:-fargate-runner}-$(hostname)"
 fi
 
-# mark runner initially idle in DynamoDB
-[ -n "$RUNNER_TABLE" ] && /home/runner/runner_status.py idle || true
+# mark runner initially idle
+[ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.py idle || true
 
 cleanup() {
     echo "Removing runner..."
-    [ -n "$RUNNER_TABLE" ] && /home/runner/runner_status.py offline || true
+    [ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.py offline || true
     ./config.sh remove --unattended --token "$RUNNER_TOKEN"
 }
 
