@@ -1,4 +1,14 @@
-# ECS Runner Fleet
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="/assets/img.png">
+  <img alt="aws-runner-fleet logo" src="/assets/img.png" width="25%" height="25%">
+</picture>
+
+**AWS Runner Fleet**
+</div>
+
+---
 
 ECS Runner Fleet provides ephemeral GitHub Actions self-hosted runners powered by AWS ECS Fargate. Runners are launched on-demand in response to workflow events, allowing teams to scale builds automatically while keeping isolation and cost under control.
 
