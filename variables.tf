@@ -66,6 +66,12 @@ variable "runner_class_sizes" {
   }
 }
 
+variable "event_bus_name" {
+  description = "Name of the EventBridge event bus"
+  type        = string
+  default     = "runner-control-plane"
+}
+
 
 
 

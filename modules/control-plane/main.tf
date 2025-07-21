@@ -15,6 +15,10 @@ resource "aws_dynamodb_table" "runner_status" {
   }
 }
 
+resource "aws_cloudwatch_event_bus" "control_plane" {
+  name = var.event_bus_name
+}
+
 resource "aws_iam_role" "lambda" {
   name               = "runner-control-plane"
   assume_role_policy = data.aws_iam_policy_document.lambda_trust.json

@@ -53,7 +53,7 @@ variable "label_task_definition_arns" {
 }
 
 variable "event_bus_name" {
-  description = "Name of the EventBridge bus for runner status events"
+  description = "Name of the EventBridge event bus"
   type        = string
-  default     = "default"
+  default     = "runner-control-plane"
 }

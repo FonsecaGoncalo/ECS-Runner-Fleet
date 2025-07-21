@@ -12,6 +12,7 @@ module "control_plane" {
   ecs_cluster                = module.ecs_fleet.cluster_name
   ecs_subnet_ids             = var.subnet_ids
   security_groups            = var.security_groups
+  event_bus_name             = var.event_bus_name
   github_pat                 = var.github_pat
   github_repo                = var.github_repo
   webhook_secret             = var.webhook_secret
