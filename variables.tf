@@ -24,17 +24,17 @@ variable "runner_image_tag" {
 
 variable "extra_runner_images" {
   description = "Map of additional runner labels to Dockerfile directories"
-  type = map(string)
-  default = {}
+  type        = map(string)
+  default     = {}
 }
 
 variable "subnet_ids" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 
 variable "security_groups" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 

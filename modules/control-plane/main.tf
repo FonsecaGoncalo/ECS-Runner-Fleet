@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "lambda_trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
-      type = "Service"
+      type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
     }
   }
@@ -63,7 +63,7 @@ data "aws_iam_policy_document" "lambda_policy" {
   }
 
   statement {
-    actions = ["ssm:GetParameter"]
+    actions   = ["ssm:GetParameter"]
     resources = [aws_ssm_parameter.class_sizes.arn]
   }
 }
@@ -84,8 +84,8 @@ data "archive_file" "lambda_zip" {
 }
 
 resource "aws_ssm_parameter" "class_sizes" {
-  name = "/ecs-runner/class-sizes"
-  type = "String"
+  name  = "/ecs-runner/class-sizes"
+  type  = "String"
   value = jsonencode(var.runner_class_sizes)
 }
 
@@ -99,16 +99,16 @@ resource "aws_lambda_function" "control_plane" {
 
   environment {
     variables = {
-      CLUSTER               = var.ecs_cluster
-      TASK_DEFINITION       = aws_ecs_task_definition.runner_task.arn
-      LABEL_TASK_DEFINITIONS = jsonencode({for k, v in aws_ecs_task_definition.runner_task_extra : k => v.arn})
-      SUBNETS = join(",", var.ecs_subnet_ids)
-      SECURITY_GROUPS = join(",", var.security_groups)
-      GITHUB_PAT            = var.github_pat
-      GITHUB_REPO           = var.github_repo
-      GITHUB_WEBHOOK_SECRET = var.webhook_secret
-      RUNNER_TABLE          = aws_dynamodb_table.runner_status.name
-      CLASS_SIZES_PARAM     = aws_ssm_parameter.class_sizes.name
+      CLUSTER                = var.ecs_cluster
+      TASK_DEFINITION        = var.task_definition_arn
+      LABEL_TASK_DEFINITIONS = jsonencode(var.label_task_definition_arns)
+      SUBNETS                = join(",", var.ecs_subnet_ids)
+      SECURITY_GROUPS        = join(",", var.security_groups)
+      GITHUB_PAT             = var.github_pat
+      GITHUB_REPO            = var.github_repo
+      GITHUB_WEBHOOK_SECRET  = var.webhook_secret
+      RUNNER_TABLE           = aws_dynamodb_table.runner_status.name
+      CLASS_SIZES_PARAM      = aws_ssm_parameter.class_sizes.name
     }
   }
 }
@@ -135,8 +135,4 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.webhook_api.id
   name        = "$default"
   auto_deploy = true
-}
-
-output "webhook_url" {
-  value = aws_apigatewayv2_stage.default.invoke_url
 }

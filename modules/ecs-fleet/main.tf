@@ -8,14 +8,14 @@ resource "aws_cloudwatch_log_group" "ecs_runner" {
 }
 
 resource "aws_ecs_task_definition" "runner_task" {
-  family             = "github-runner"
+  family                   = "github-runner"
   requires_compatibilities = ["FARGATE"]
-  network_mode       = "awsvpc"
-  cpu                = 1024
-  memory             = 2048
-  execution_role_arn = aws_iam_role.task_execution.arn
-  task_role_arn      = aws_iam_role.task.arn
-  depends_on = [null_resource.build_runner_image]
+  network_mode             = "awsvpc"
+  cpu                      = 1024
+  memory                   = 2048
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+  depends_on               = [null_resource.build_runner_image]
 
   container_definitions = jsonencode([
     {
@@ -26,7 +26,7 @@ resource "aws_ecs_task_definition" "runner_task" {
       essential = true
       environment = [
         { name = "GITHUB_REPO", value = var.github_repo },
-        { name = "RUNNER_TABLE", value = aws_dynamodb_table.runner_status.name },
+        { name = "RUNNER_TABLE", value = var.runner_table_name },
         { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
         { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
       ],
@@ -43,15 +43,15 @@ resource "aws_ecs_task_definition" "runner_task" {
 }
 
 resource "aws_ecs_task_definition" "runner_task_extra" {
-  for_each           = var.extra_runner_images
-  family             = "github-runner-${each.key}"
+  for_each                 = var.extra_runner_images
+  family                   = "github-runner-${each.key}"
   requires_compatibilities = ["FARGATE"]
-  network_mode       = "awsvpc"
-  cpu                = 1024
-  memory             = 2048
-  execution_role_arn = aws_iam_role.task_execution.arn
-  task_role_arn      = aws_iam_role.task.arn
-  depends_on = [null_resource.build_extra_images]
+  network_mode             = "awsvpc"
+  cpu                      = 1024
+  memory                   = 2048
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+  depends_on               = [null_resource.build_extra_images]
 
   container_definitions = jsonencode([
     {
@@ -62,7 +62,7 @@ resource "aws_ecs_task_definition" "runner_task_extra" {
       essential = true
       environment = [
         { name = "GITHUB_REPO", value = var.github_repo },
-        { name = "RUNNER_TABLE", value = aws_dynamodb_table.runner_status.name },
+        { name = "RUNNER_TABLE", value = var.runner_table_name },
         { name = "ACTIONS_RUNNER_HOOK_JOB_STARTED", value = "/home/runner/job_started.sh" },
         { name = "ACTIONS_RUNNER_HOOK_JOB_COMPLETED", value = "/home/runner/job_completed.sh" }
       ]
@@ -105,9 +105,9 @@ resource "aws_iam_role_policy" "task_dynamodb" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
-        Effect = "Allow"
-        Resource = [aws_dynamodb_table.runner_status.arn]
+        Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
+        Effect   = "Allow"
+        Resource = [var.runner_table_arn]
       }
     ]
   })
@@ -117,7 +117,7 @@ data "aws_iam_policy_document" "ecs_task_trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
-      type = "Service"
+      type        = "Service"
       identifiers = ["ecs-tasks.amazonaws.com"]
     }
   }
