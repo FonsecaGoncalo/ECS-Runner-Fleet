@@ -19,6 +19,17 @@ module "control_plane" {
   task_definition_arn        = module.ecs_fleet.task_definition_arn
   label_task_definition_arns = module.ecs_fleet.extra_task_definition_arns
   event_bus_name             = var.event_bus_name
+  runner_repository_url      = module.ecs_fleet.repository_url
+  runner_image_tag           = var.runner_image_tag
+  image_build_project        = var.image_build_project
+}
+
+module "image_build_project" {
+  count        = var.image_build_project == "" ? 0 : 1
+  source       = "./modules/image-build-project"
+  project_name = var.image_build_project
+  github_repo  = var.github_repo
+  github_pat   = var.github_pat
 }
 
 output "webhook_url" {

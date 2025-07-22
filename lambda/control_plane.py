@@ -23,6 +23,13 @@ RUNNER_TABLE = os.environ.get("RUNNER_TABLE")
 CLASS_SIZES_PARAM = os.environ.get("CLASS_SIZES_PARAM")
 LABEL_TASK_DEFINITIONS = json.loads(os.environ.get("LABEL_TASK_DEFINITIONS", "{}"))
 
+ECR_REPOSITORY = os.environ.get("RUNNER_REPOSITORY_URL")
+RUNNER_IMAGE_TAG = os.environ.get("RUNNER_IMAGE_TAG", "latest")
+IMAGE_BUILD_PROJECT = os.environ.get("IMAGE_BUILD_PROJECT")
+
+codebuild = boto3.client("codebuild") if IMAGE_BUILD_PROJECT else None
+ecr = boto3.client("ecr") if ECR_REPOSITORY else None
+
 _class_sizes = None
 
 def get_class_sizes():
@@ -53,6 +60,61 @@ def get_runner_token(repo, pat):
     with urllib.request.urlopen(req) as resp:
         data = json.load(resp)
     return data["token"]
+
+
+def sanitize_image_label(label: str) -> str:
+    return label.replace("/", "-").replace(":", "-")
+
+
+def ensure_image_exists(base_image: str) -> str:
+    if not ecr or not codebuild:
+        raise Exception("Dynamic image build not configured")
+    tag = f"{RUNNER_IMAGE_TAG}-{sanitize_image_label(base_image)}"
+    repo_name = ECR_REPOSITORY.split("/")[-1]
+    try:
+        ecr.describe_images(repositoryName=repo_name, imageIds=[{"imageTag": tag}])
+        print(f"Image {tag} already in repository")
+    except ecr.exceptions.ImageNotFoundException:
+        print(f"Building image for {base_image} as {tag}")
+        build = codebuild.start_build(
+            projectName=IMAGE_BUILD_PROJECT,
+            environmentVariablesOverride=[
+                {"name": "BASE_IMAGE", "value": base_image, "type": "PLAINTEXT"},
+                {"name": "TARGET_TAG", "value": tag, "type": "PLAINTEXT"},
+                {"name": "REPOSITORY", "value": repo_name, "type": "PLAINTEXT"},
+            ],
+        )
+        build_id = build["build"]["id"]
+        status = "IN_PROGRESS"
+        while status == "IN_PROGRESS":
+            time.sleep(10)
+            resp = codebuild.batch_get_builds(ids=[build_id])
+            status = resp["builds"][0]["buildStatus"]
+            print(f"Build status: {status}")
+        if status != "SUCCEEDED":
+            raise Exception(f"Image build failed: {status}")
+    return f"{ECR_REPOSITORY}:{tag}"
+
+
+def register_temp_task_definition(image_uri: str, label: str) -> str:
+    resp = ecs.describe_task_definition(taskDefinition=TASK_DEFINITION)
+    td = resp["taskDefinition"]
+    container = td["containerDefinitions"][0]
+    container["image"] = image_uri
+    for field in ["taskDefinitionArn", "revision", "status", "requiresAttributes", "compatibilities", "registeredAt", "registeredBy"]:
+        td.pop(field, None)
+    td["family"] = f"{td['family']}-{sanitize_image_label(label)}"
+    new_td = ecs.register_task_definition(
+        family=td["family"],
+        networkMode=td["networkMode"],
+        executionRoleArn=td.get("executionRoleArn"),
+        taskRoleArn=td.get("taskRoleArn"),
+        requiresCompatibilities=td.get("requiresCompatibilities"),
+        cpu=str(td.get("cpu")),
+        memory=str(td.get("memory")),
+        containerDefinitions=[container],
+    )
+    return new_td["taskDefinition"]["taskDefinitionArn"]
 
 
 def handle_status_event(detail):
@@ -166,6 +228,16 @@ def lambda_handler(event, context):
         if lbl in LABEL_TASK_DEFINITIONS:
             task_def = LABEL_TASK_DEFINITIONS[lbl]
             print(f"Using task definition for label {lbl}: {task_def}")
+            break
+    for lbl in job_labels:
+        if lbl.startswith("image:"):
+            base_image = lbl.split(":", 1)[1]
+            try:
+                image_uri = ensure_image_exists(base_image)
+                task_def = register_temp_task_definition(image_uri, lbl)
+                print(f"Using dynamic image {image_uri}")
+            except Exception as exc:
+                print(f"Failed to prepare image {base_image}: {exc}")
             break
     class_name = None
     for lbl in job_labels:

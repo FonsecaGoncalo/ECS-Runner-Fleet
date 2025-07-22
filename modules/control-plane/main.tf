@@ -139,6 +139,9 @@ resource "aws_lambda_function" "control_plane" {
       GITHUB_WEBHOOK_SECRET  = var.webhook_secret
       RUNNER_TABLE           = aws_dynamodb_table.runner_status.name
       CLASS_SIZES_PARAM      = aws_ssm_parameter.class_sizes.name
+      RUNNER_REPOSITORY_URL  = var.runner_repository_url
+      RUNNER_IMAGE_TAG       = var.runner_image_tag
+      IMAGE_BUILD_PROJECT    = var.image_build_project
     }
   }
 }

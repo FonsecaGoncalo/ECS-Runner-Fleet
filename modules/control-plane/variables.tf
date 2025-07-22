@@ -57,3 +57,19 @@ variable "event_bus_name" {
   type        = string
   default     = "runner-control-plane"
 }
+
+variable "runner_repository_url" {
+  description = "ECR repository URL for runner images"
+  type        = string
+}
+
+variable "runner_image_tag" {
+  description = "Base tag used for runner images"
+  type        = string
+}
+
+variable "image_build_project" {
+  description = "Optional CodeBuild project for dynamic image builds"
+  type        = string
+  default     = ""
+}

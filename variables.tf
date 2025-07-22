@@ -66,6 +66,12 @@ variable "event_bus_name" {
   default     = "runner-control-plane"
 }
 
+variable "image_build_project" {
+  description = "Optional CodeBuild project for dynamic image builds"
+  type        = string
+  default     = ""
+}
+
 
 
 

@@ -39,8 +39,15 @@ All infrastructure is defined as a Terraform module consisting of two sub-module
 | `extra_runner_images` | Map of labels to Dockerfile paths for additional images |
 | `runner_class_sizes` | Map of runner "class" names to CPU and memory settings |
 | `event_bus_name` | Name of the EventBridge bus |
+| `image_build_project` | Optional name of a CodeBuild project used for dynamic image builds |
 
 The module outputs the webhook URL for GitHub and additional resource identifiers.
+
+If `image_build_project` is set the module also provisions a CodeBuild project with that name.
+Jobs can then use labels of the form `image:<base-image>`. When such a job is queued
+the control plane triggers the project to build a runner image using [`runner/Dockerfile`](runner/Dockerfile)
+but replacing its `FROM` statement with `<base-image>`. After the build completes a temporary
+task definition is registered with the new image to run the workflow. Subsequent jobs reuse the built image if it exists in ECR.
 
 Example usage can be found under [`examples/ecs-fleet-example`](examples/ecs-fleet-example).
 
