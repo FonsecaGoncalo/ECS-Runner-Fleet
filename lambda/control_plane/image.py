@@ -12,18 +12,16 @@ def ensure_image_exists(base_image: str) -> str:
     """Ensure a runner image exists for the requested base image."""
     if not config.ecr or not config.codebuild:
         raise Exception("Dynamic image build not configured")
-    tag = f"{config.RUNNER_IMAGE_TAG}-{sanitize_image_label(base_image)}"
     repo_name = config.ECR_REPOSITORY.split("/")[-1]
     try:
-        config.ecr.describe_images(repositoryName=repo_name, imageIds=[{"imageTag": tag}])
-        print(f"Image {tag} already in repository")
+        config.ecr.describe_images(repositoryName=repo_name, imageIds=[{"imageTag": base_image}])
+        print(f"Image {base_image} already in repository")
     except config.ecr.exceptions.ImageNotFoundException:
-        print(f"Building image for {base_image} as {tag}")
+        print(f"Building image for {base_image}")
         build = config.codebuild.start_build(
             projectName=config.IMAGE_BUILD_PROJECT,
             environmentVariablesOverride=[
                 {"name": "BASE_IMAGE", "value": base_image, "type": "PLAINTEXT"},
-                {"name": "TARGET_TAG", "value": tag, "type": "PLAINTEXT"},
                 {"name": "REPOSITORY", "value": repo_name, "type": "PLAINTEXT"},
             ],
         )
@@ -36,7 +34,7 @@ def ensure_image_exists(base_image: str) -> str:
             print(f"Build status: {status}")
         if status != "SUCCEEDED":
             raise Exception(f"Image build failed: {status}")
-    return f"{config.ECR_REPOSITORY}:{tag}"
+    return f"{config.ECR_REPOSITORY}:{base_image}"
 
 
 def register_temp_task_definition(image_uri: str, label: str) -> str:
