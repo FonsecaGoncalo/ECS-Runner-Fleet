@@ -30,6 +30,7 @@ module "image_build_project" {
   project_name = var.image_build_project
   github_repo  = var.github_repo
   github_pat   = var.github_pat
+  ecr_url      = "${module.ecs_fleet.repository_url}/${module.ecs_fleet.repository_name}"
 }
 
 output "webhook_url" {

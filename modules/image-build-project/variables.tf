@@ -14,3 +14,8 @@ variable "github_pat" {
   type        = string
   default     = ""
 }
+
+variable "ecr_url" {
+  description = "ECR url"
+  type        = string
+}

@@ -93,6 +93,11 @@ resource "aws_codebuild_project" "builder" {
         type  = "PLAINTEXT"
       }
     }
+
+    environment_variable {
+      name  = "REPO_URI"
+      value = var.ecr_url
+    }
   }
 
   source {
