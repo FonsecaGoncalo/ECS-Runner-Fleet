@@ -2,12 +2,11 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - git clone https://$GITHUB_PAT@github.com/$GITHUB_REPO source
       - export REPO_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/$REPOSITORY
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPO_URI
   build:
     commands:
-      - docker build --platform linux/amd64 --build-arg BASE_IMAGE=$BASE_IMAGE -t $REPO_URI:$TARGET_TAG source/runner
+      - docker build --platform linux/amd64 --build-arg BASE_IMAGE=$BASE_IMAGE -t $REPO_URI:$TARGET_TAG .
   post_build:
     commands:
       - docker push $REPO_URI:$TARGET_TAG

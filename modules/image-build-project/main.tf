@@ -37,9 +37,34 @@ resource "aws_iam_role_policy" "codebuild" {
           "logs:PutLogEvents"
         ],
         Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["s3:GetObject"],
+        Resource = "${aws_s3_bucket.runner_source.arn}/*"
       }
     ]
   })
+}
+
+data "aws_caller_identity" "current" {}
+
+data "archive_file" "runner_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../runner"
+  output_path = "${path.module}/runner.zip"
+}
+
+resource "aws_s3_bucket" "runner_source" {
+  bucket        = "${data.aws_caller_identity.current.account_id}-runner-src"
+  force_destroy = true
+}
+
+resource "aws_s3_object" "runner_source" {
+  bucket = aws_s3_bucket.runner_source.id
+  key    = "runner.zip"
+  source = data.archive_file.runner_zip.output_path
+  etag   = data.archive_file.runner_zip.output_md5
 }
 
 resource "aws_codebuild_project" "builder" {
@@ -52,19 +77,27 @@ resource "aws_codebuild_project" "builder" {
     type            = "LINUX_CONTAINER"
     privileged_mode = true
 
-    environment_variable {
-      name  = "GITHUB_REPO"
-      value = var.github_repo
+    dynamic "environment_variable" {
+      for_each = var.github_repo == "" ? [] : [1]
+      content {
+        name  = "GITHUB_REPO"
+        value = var.github_repo
+      }
     }
-    environment_variable {
-      name  = "GITHUB_PAT"
-      value = var.github_pat
-      type  = "PLAINTEXT"
+
+    dynamic "environment_variable" {
+      for_each = var.github_pat == "" ? [] : [1]
+      content {
+        name  = "GITHUB_PAT"
+        value = var.github_pat
+        type  = "PLAINTEXT"
+      }
     }
   }
 
   source {
-    type      = "NO_SOURCE"
+    type      = "S3"
+    location  = "${aws_s3_bucket.runner_source.bucket}/runner.zip"
     buildspec = file("${path.module}/buildspec.yml")
   }
 
