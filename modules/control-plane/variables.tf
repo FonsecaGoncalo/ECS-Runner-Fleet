@@ -41,16 +41,6 @@ variable "runner_class_sizes" {
   }
 }
 
-variable "task_definition_arn" {
-  description = "ARN of the default runner task definition"
-  type        = string
-}
-
-variable "label_task_definition_arns" {
-  description = "Map of additional runner task definition ARNs by label"
-  type        = map(string)
-  default     = {}
-}
 
 variable "event_bus_name" {
   description = "Name of the EventBridge event bus"
@@ -72,4 +62,19 @@ variable "image_build_project" {
   description = "Optional CodeBuild project for dynamic image builds"
   type        = string
   default     = ""
+}
+
+variable "execution_role_arn" {
+  description = "ARN of the ECS task execution role"
+  type        = string
+}
+
+variable "task_role_arn" {
+  description = "ARN of the ECS task role"
+  type        = string
+}
+
+variable "log_group_name" {
+  description = "CloudWatch log group name for runner tasks"
+  type        = string
 }

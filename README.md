@@ -16,7 +16,7 @@ ECS Runner Fleet provides ephemeral GitHub Actions self-hosted runners powered b
 The solution is composed of two main parts:
 
 1. **Control plane** – A Lambda function orchestrated through API Gateway and EventBridge. It validates GitHub webhooks, fetches runner tokens and starts ECS tasks. Runner status updates are stored in DynamoDB.
-2. **ECS fleet** – A set of Fargate task definitions and an ECS cluster where runner containers execute jobs. Images are built and stored in ECR and can be extended per label.
+2. **ECS fleet** – An ECS cluster, IAM roles and an ECR repository where runner containers execute jobs. Task definitions are registered on demand by the control plane and images can be built lazily using `image:` labels.
 
 The event flow is:
 
@@ -36,7 +36,6 @@ All infrastructure is defined as a Terraform module consisting of two sub-module
 | `subnet_ids` | Subnets where Fargate tasks run |
 | `security_groups` | Security groups for the tasks |
 | `runner_image_tag` | Tag for the base runner Docker image |
-| `extra_runner_images` | Map of labels to Dockerfile paths for additional images |
 | `runner_class_sizes` | Map of runner "class" names to CPU and memory settings |
 | `event_bus_name` | Name of the EventBridge bus |
 | `image_build_project` | Optional name of a CodeBuild project used for dynamic image builds |

@@ -44,6 +44,8 @@ data "aws_iam_policy_document" "lambda_policy" {
     actions = [
       "ecs:RunTask",
       "ecs:DescribeTasks",
+      "ecs:DescribeTaskDefinition",
+      "ecs:RegisterTaskDefinition",
       "iam:PassRole"
     ]
     resources = ["*"]
@@ -139,19 +141,21 @@ resource "aws_lambda_function" "control_plane" {
 
   environment {
     variables = {
-      CLUSTER                = var.ecs_cluster
-      TASK_DEFINITION        = var.task_definition_arn
-      LABEL_TASK_DEFINITIONS = jsonencode(var.label_task_definition_arns)
-      SUBNETS                = join(",", var.ecs_subnet_ids)
-      SECURITY_GROUPS        = join(",", var.security_groups)
-      GITHUB_PAT             = var.github_pat
-      GITHUB_REPO            = var.github_repo
-      GITHUB_WEBHOOK_SECRET  = var.webhook_secret
-      RUNNER_TABLE           = aws_dynamodb_table.runner_status.name
-      CLASS_SIZES_PARAM      = aws_ssm_parameter.class_sizes.name
-      RUNNER_REPOSITORY_URL  = var.runner_repository_url
-      RUNNER_IMAGE_TAG       = var.runner_image_tag
-      IMAGE_BUILD_PROJECT    = var.image_build_project
+      CLUSTER               = var.ecs_cluster
+      SUBNETS               = join(",", var.ecs_subnet_ids)
+      SECURITY_GROUPS       = join(",", var.security_groups)
+      GITHUB_PAT            = var.github_pat
+      GITHUB_REPO           = var.github_repo
+      GITHUB_WEBHOOK_SECRET = var.webhook_secret
+      RUNNER_TABLE          = aws_dynamodb_table.runner_status.name
+      CLASS_SIZES_PARAM     = aws_ssm_parameter.class_sizes.name
+      RUNNER_REPOSITORY_URL = var.runner_repository_url
+      RUNNER_IMAGE_TAG      = var.runner_image_tag
+      IMAGE_BUILD_PROJECT   = var.image_build_project
+      EXECUTION_ROLE_ARN    = var.execution_role_arn
+      TASK_ROLE_ARN         = var.task_role_arn
+      LOG_GROUP_NAME        = var.log_group_name
+      EVENT_BUS_NAME        = var.event_bus_name
     }
   }
 }

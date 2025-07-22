@@ -22,11 +22,6 @@ variable "runner_image_tag" {
   description = "Tag used when building and pushing the runner image"
 }
 
-variable "extra_runner_images" {
-  description = "Map of additional runner labels to Dockerfile directories"
-  type        = map(string)
-  default     = {}
-}
 
 variable "subnet_ids" {
   type    = list(string)

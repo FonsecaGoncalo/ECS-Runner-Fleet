@@ -1,3 +1,4 @@
+import os
 import time
 
 import config
@@ -37,31 +38,48 @@ def ensure_image_exists(base_image: str) -> str:
     return f"{config.ECR_REPOSITORY}:{base_image}"
 
 
-def register_temp_task_definition(image_uri: str, label: str) -> str:
-    """Register a temporary task definition using the provided image."""
-    resp = config.ecs.describe_task_definition(taskDefinition=config.TASK_DEFINITION)
-    td = resp["taskDefinition"]
-    container = td["containerDefinitions"][0]
-    container["image"] = image_uri
-    for field in [
-        "taskDefinitionArn",
-        "revision",
-        "status",
-        "requiresAttributes",
-        "compatibilities",
-        "registeredAt",
-        "registeredBy",
-    ]:
-        td.pop(field, None)
-    td["family"] = f"{td['family']}-{sanitize_image_label(label)}"
-    new_td = config.ecs.register_task_definition(
-        family=td["family"],
-        networkMode=td["networkMode"],
-        executionRoleArn=td.get("executionRoleArn"),
-        taskRoleArn=td.get("taskRoleArn"),
-        requiresCompatibilities=td.get("requiresCompatibilities"),
-        cpu=str(td.get("cpu")),
-        memory=str(td.get("memory")),
+def register_task_definition(image_uri: str, label: str | None = None) -> str:
+    """Register a task definition for the runner image."""
+    family = "github-runner"
+    if label:
+        family = f"{family}-{sanitize_image_label(label)}"
+
+    container = {
+        "name": "runner",
+        "image": image_uri,
+        "cpu": 1024,
+        "memory": 2048,
+        "essential": True,
+        "environment": [
+            {"name": "GITHUB_REPO", "value": config.GITHUB_REPO},
+            {"name": "EVENT_BUS_NAME", "value": config.EVENT_BUS_NAME or ""},
+            {
+                "name": "ACTIONS_RUNNER_HOOK_JOB_STARTED",
+                "value": "/home/runner/job_started.sh",
+            },
+            {
+                "name": "ACTIONS_RUNNER_HOOK_JOB_COMPLETED",
+                "value": "/home/runner/job_completed.sh",
+            },
+        ],
+        "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+                "awslogs-group": config.LOG_GROUP_NAME,
+                "awslogs-region": os.environ.get("AWS_REGION", "us-east-1"),
+                "awslogs-stream-prefix": "runner",
+            },
+        },
+    }
+
+    resp = config.ecs.register_task_definition(
+        family=family,
+        networkMode="awsvpc",
+        executionRoleArn=config.EXECUTION_ROLE_ARN,
+        taskRoleArn=config.TASK_ROLE_ARN,
+        requiresCompatibilities=["FARGATE"],
+        cpu="1024",
+        memory="2048",
         containerDefinitions=[container],
     )
-    return new_td["taskDefinition"]["taskDefinitionArn"]
+    return resp["taskDefinition"]["taskDefinitionArn"]

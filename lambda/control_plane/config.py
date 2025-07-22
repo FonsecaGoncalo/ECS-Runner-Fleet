@@ -10,7 +10,6 @@ ssm = boto3.client("ssm")
 
 # environment configuration
 CLUSTER = os.environ.get("CLUSTER", "runner-cluster")
-TASK_DEFINITION = os.environ["TASK_DEFINITION"]
 SUBNETS = os.environ.get("SUBNETS", "").split(",")
 SECURITY_GROUPS = os.environ.get("SECURITY_GROUPS", "").split(",")
 GITHUB_PAT = os.environ.get("GITHUB_PAT")
@@ -18,7 +17,10 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO")
 WEBHOOK_SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET")
 RUNNER_TABLE = os.environ.get("RUNNER_TABLE")
 CLASS_SIZES_PARAM = os.environ.get("CLASS_SIZES_PARAM")
-LABEL_TASK_DEFINITIONS = json.loads(os.environ.get("LABEL_TASK_DEFINITIONS", "{}"))
+EXECUTION_ROLE_ARN = os.environ.get("EXECUTION_ROLE_ARN")
+TASK_ROLE_ARN = os.environ.get("TASK_ROLE_ARN")
+LOG_GROUP_NAME = os.environ.get("LOG_GROUP_NAME")
+EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME")
 
 ECR_REPOSITORY = os.environ.get("RUNNER_REPOSITORY_URL")
 RUNNER_IMAGE_TAG = os.environ.get("RUNNER_IMAGE_TAG", "latest")

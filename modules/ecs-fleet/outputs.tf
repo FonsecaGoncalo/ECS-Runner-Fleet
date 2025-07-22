@@ -3,15 +3,6 @@ output "cluster_name" {
   value       = aws_ecs_cluster.runner_cluster.name
 }
 
-output "task_definition_arn" {
-  description = "ARN of the default runner task definition"
-  value       = aws_ecs_task_definition.runner_task.arn
-}
-
-output "extra_task_definition_arns" {
-  description = "Map of additional runner task definition ARNs"
-  value       = { for k, v in aws_ecs_task_definition.runner_task_extra : k => v.arn }
-}
 
 output "repository_url" {
   description = "ECR repository URL for runner images"
@@ -21,4 +12,19 @@ output "repository_url" {
 output "repository_name" {
   description = "ECR repository name for runner images"
   value       = aws_ecr_repository.runner.name
+}
+
+output "execution_role_arn" {
+  description = "ARN of the ECS task execution role"
+  value       = aws_iam_role.task_execution.arn
+}
+
+output "task_role_arn" {
+  description = "ARN of the ECS task role"
+  value       = aws_iam_role.task.arn
+}
+
+output "log_group_name" {
+  description = "Name of the CloudWatch log group for runner tasks"
+  value       = aws_cloudwatch_log_group.ecs_runner.name
 }

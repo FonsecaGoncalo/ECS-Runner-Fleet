@@ -6,7 +6,7 @@ import json
 from boto3.dynamodb.conditions import Attr
 
 import config
-from image import ensure_image_exists, register_temp_task_definition
+from image import ensure_image_exists, register_task_definition
 from status import handle_status_event
 from github import get_runner_token
 
@@ -69,19 +69,15 @@ def lambda_handler(event, context):
     job = payload.get("workflow_job", {})
     job_labels = job.get("labels", [])
     runner_labels = ",".join(job_labels) if job_labels else "default-runner"
-    task_def = config.TASK_DEFINITION
-    # for lbl in job_labels:
-    #     if lbl in config.LABEL_TASK_DEFINITIONS:
-    #         task_def = config.LABEL_TASK_DEFINITIONS[lbl]
-    #         print(f"Using task definition for label {lbl}: {task_def}")
-    #         break
+    # image_uri = f"{config.ECR_REPOSITORY}:{config.RUNNER_IMAGE_TAG}"
+    # task_def = register_task_definition(image_uri)
+    print(f"Job labels: {runner_labels}")
     for lbl in job_labels:
         if lbl.startswith("image:"):
-            print(f"Using image definition for label {lbl}: {task_def}")
             base_image = lbl.split(":", 1)[1]
             try:
                 image_uri = ensure_image_exists(base_image)
-                task_def = register_temp_task_definition(image_uri, lbl)
+                task_def = register_task_definition(image_uri, lbl)
                 print(f"Using dynamic image {image_uri}")
             except Exception as exc:
                 print(f"Failed to prepare image {base_image}: {exc}")
