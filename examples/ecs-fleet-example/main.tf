@@ -28,6 +28,8 @@ module "ecs-fleet" {
     "python" : "./runners/base_python"
   }
 
+  image_build_project = "image_builder"
+
   runner_class_sizes = {
     small = {
       cpu    = 512
