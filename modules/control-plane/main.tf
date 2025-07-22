@@ -72,6 +72,16 @@ data "aws_iam_policy_document" "lambda_policy" {
     actions   = ["ssm:GetParameter"]
     resources = [aws_ssm_parameter.class_sizes.arn]
   }
+
+  statement {
+    actions   = ["ecr:DescribeImages"]
+    resources = ["*"]
+  }
+
+  statement {
+    actions   = ["codebuild:StartBuild"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_lambda_permission" "allow_apigw" {
