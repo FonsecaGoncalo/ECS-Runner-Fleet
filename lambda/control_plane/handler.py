@@ -5,10 +5,10 @@ import json
 
 from boto3.dynamodb.conditions import Attr
 
-from . import config
-from .image import ensure_image_exists, register_temp_task_definition
-from .status import handle_status_event
-from .token import get_runner_token
+import config
+from image import ensure_image_exists, register_temp_task_definition
+from status import handle_status_event
+from github import get_runner_token
 
 
 def lambda_handler(event, context):
@@ -57,12 +57,12 @@ def lambda_handler(event, context):
         print(f"Ignoring action: {action}")
         return {"statusCode": 200, "body": "ignored"}
 
-    if config.RUNNER_TABLE:
-        table = config.dynamodb.Table(config.RUNNER_TABLE)
-        resp = table.scan(FilterExpression=Attr("status").eq("idle"))
-        if resp.get("Items"):
-            print("Idle runner available, skipping new task")
-            return {"statusCode": 200, "body": "runner available"}
+    # if config.RUNNER_TABLE:
+    #     table = config.dynamodb.Table(config.RUNNER_TABLE)
+    #     resp = table.scan(FilterExpression=Attr("status").eq("idle"))
+    #     if resp.get("Items"):
+    #         print("Idle runner available, skipping new task")
+    #         return {"statusCode": 200, "body": "runner available"}
 
     token = get_runner_token(config.GITHUB_REPO, config.GITHUB_PAT)
 
@@ -70,13 +70,14 @@ def lambda_handler(event, context):
     job_labels = job.get("labels", [])
     runner_labels = ",".join(job_labels) if job_labels else "default-runner"
     task_def = config.TASK_DEFINITION
-    for lbl in job_labels:
-        if lbl in config.LABEL_TASK_DEFINITIONS:
-            task_def = config.LABEL_TASK_DEFINITIONS[lbl]
-            print(f"Using task definition for label {lbl}: {task_def}")
-            break
+    # for lbl in job_labels:
+    #     if lbl in config.LABEL_TASK_DEFINITIONS:
+    #         task_def = config.LABEL_TASK_DEFINITIONS[lbl]
+    #         print(f"Using task definition for label {lbl}: {task_def}")
+    #         break
     for lbl in job_labels:
         if lbl.startswith("image:"):
+            print(f"Using image definition for label {lbl}: {task_def}")
             base_image = lbl.split(":", 1)[1]
             try:
                 image_uri = ensure_image_exists(base_image)

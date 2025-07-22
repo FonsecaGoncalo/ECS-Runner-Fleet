@@ -1,7 +1,7 @@
 import json
 import time
 
-from . import config
+import config
 
 
 def handle_status_event(detail) -> None:

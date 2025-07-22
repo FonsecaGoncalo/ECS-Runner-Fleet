@@ -1,6 +1,6 @@
 import time
 
-from . import config
+import config
 
 
 def sanitize_image_label(label: str) -> str:

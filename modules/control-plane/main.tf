@@ -109,7 +109,7 @@ resource "aws_lambda_permission" "allow_events" {
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambda"
+  source_dir  = "${path.module}/../../lambda/control_plane"
   output_path = "../lambda.zip"
 }
 
@@ -123,7 +123,7 @@ resource "aws_lambda_function" "control_plane" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = "runner-control-plane"
   role             = aws_iam_role.lambda.arn
-  handler          = "control_plane.lambda_handler"
+  handler          = "handler.lambda_handler"
   runtime          = "python3.12"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
