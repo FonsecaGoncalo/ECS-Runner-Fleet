@@ -5,7 +5,7 @@ on:
 
 jobs:
   run-on-ecs:
-    runs-on: [self-hosted, container:hello-world:nanoserver-ltsc2025]
+    runs-on: [self-hosted, image:hello-world:nanoserver-ltsc2025]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
