@@ -3,8 +3,11 @@ import hashlib
 import hmac
 import json
 
+import ulid
+
 import config
-from image import ensure_image_exists
+from image import ensure_image_exists, get_image, build_image
+from runners import put_item
 import runner
 
 
@@ -56,20 +59,32 @@ def handle_webhook_event(event):
         elif lbl.startswith("class:"):
             class_name = lbl.split(":", 1)[1]
 
-    if base_image:
-        try:
-            image_uri = ensure_image_exists(base_image, runner_labels, class_name)
-            if image_uri is None:
-                print("Image build triggered, exiting")
-                return {"statusCode": 202, "body": "image build"}
-            label = f"image:{base_image}"
-            print(f"Using dynamic image {image_uri}")
-        except Exception as exc:
-            print(f"Failed to prepare image {base_image}: {exc}")
-            return {"statusCode": 500, "body": "image build failed"}
-    else:
-        image_uri = f"{config.ECR_REPOSITORY}:{config.RUNNER_IMAGE_TAG}"
-        label = None
+    if base_image is None:
+        print("No base image set")
+        return {"statusCode": 400, "body": "no base image"}
+
+    try:
+        image_uri = get_image(base_image)
+        if image_uri is None:
+            tag = build_image(base_image)
+            item = {
+                "runner_id": ulid.ulid(),
+                "item_id": "state",
+                "status": "image creating",
+                "image_tag": tag,
+                "runner_labels": runner_labels,
+            }
+            if class_name:
+                item["class_name"] = class_name
+            put_item(item)
+            print("Image build triggered, exiting")
+            return {"statusCode": 202, "body": "image build"}
+        label = f"image:{base_image}"
+        print(f"Using dynamic image {image_uri}")
+    except Exception as exc:
+        print(f"Failed to prepare image {base_image}: {exc}")
+        return {"statusCode": 500, "body": "image build failed"}
+
     runner.run_runner_task(
         image_uri,
         runner_labels,

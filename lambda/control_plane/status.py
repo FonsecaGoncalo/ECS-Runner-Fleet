@@ -2,7 +2,7 @@ import json
 import time
 
 import config
-from db import put_item, update_item
+from runners import put_item, update_item
 
 
 def handle_status_event(detail) -> None:

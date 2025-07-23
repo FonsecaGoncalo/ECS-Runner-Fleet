@@ -1,6 +1,6 @@
 import config
 import runner
-from db import get_item, update_item, delete_item
+from runners import get_item, update_item, delete_item
 
 
 def handle_image_build_event(detail):
