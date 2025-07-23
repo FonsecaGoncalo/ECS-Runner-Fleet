@@ -4,10 +4,11 @@ import hmac
 import json
 
 import ulid
+import time
 
 import config
-from image import ensure_image_exists, get_image, build_image
-from runners import put_item
+from image import get_image, build_image
+from runners import Runner, register_runner
 import runner
 
 
@@ -67,16 +68,15 @@ def handle_webhook_event(event):
         image_uri = get_image(base_image)
         if image_uri is None:
             tag = build_image(base_image)
-            item = {
-                "runner_id": ulid.ulid(),
-                "item_id": "state",
-                "status": "image creating",
-                "image_tag": tag,
-                "runner_labels": runner_labels,
-            }
-            if class_name:
-                item["class_name"] = class_name
-            put_item(item)
+            runner_rec = Runner(
+                id=ulid.ulid(),
+                state="image creating",
+                labels=runner_labels,
+                image=tag,
+                created_at=int(time.time()),
+                runner_class=class_name,
+            )
+            register_runner(runner_rec)
             print("Image build triggered, exiting")
             return {"statusCode": 202, "body": "image build"}
         label = f"image:{base_image}"

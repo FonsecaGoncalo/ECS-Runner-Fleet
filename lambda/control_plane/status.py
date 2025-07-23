@@ -2,7 +2,7 @@ import json
 import time
 
 import config
-from runners import put_item, update_item
+from runners import Runner, register_runner, update_item, record_run
 
 
 def handle_status_event(detail) -> None:
@@ -17,30 +17,29 @@ def handle_status_event(detail) -> None:
     ts = detail.get("timestamp", int(time.time()))
     run_key = detail.get("workflow_job_id")
 
-    state_item = {
-        "runner_id": runner_id,
-        "item_id": "state",
-        "status": status,
-        "timestamp": ts,
-    }
-    if run_key:
-        state_item["workflow_job_id"] = run_key
+    runner_rec = Runner(
+        id=runner_id,
+        state=status,
+        labels=detail.get("runner_labels", ""),
+        image=detail.get("image_tag"),
+        created_at=ts,
+        runner_class=detail.get("class_name"),
+        workflow_id=run_key,
+        job_id=detail.get("job"),
+    )
 
     if status == "running" and run_key:
-        state_item["started_at"] = ts
-        put_item(
-            item={
-                "runner_id": runner_id,
-                "item_id": f"run#{run_key}",
-                "run_id": run_key,
-                "repository": detail.get("repository"),
-                "workflow": detail.get("workflow"),
-                "job": detail.get("job"),
-                "started_at": ts,
-            }
+        runner_rec.started_at = ts
+        record_run(
+            runner_id,
+            run_key,
+            repository=detail.get("repository"),
+            workflow=detail.get("workflow"),
+            job=detail.get("job"),
+            started_at=ts,
         )
     elif status in ("idle", "offline", "completed"):
-        state_item["completed_at"] = ts
+        runner_rec.completed_at = ts
         if run_key:
             try:
                 update_item(
@@ -62,4 +61,4 @@ def handle_status_event(detail) -> None:
             except Exception as exc:
                 print(f"Failed to stop task {task_id}: {exc}")
 
-    put_item(state_item)
+    register_runner(runner_rec)
