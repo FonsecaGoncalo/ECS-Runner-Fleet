@@ -1,4 +1,5 @@
 import os
+import re
 
 from botocore.exceptions import ClientError
 
@@ -6,8 +7,11 @@ import config
 
 
 def sanitize_image_label(label: str) -> str:
-    """Sanitize image label for use in ECR tags."""
-    return label.replace("/", "-").replace(":", "-")
+    """Sanitize image label for use in ECR tags and task definitions."""
+    # Convert any character that isn't allowed in ECR tags or ECS family names
+    # into a hyphen.  Valid characters are letters, numbers, ``_`` and ``-``
+    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "-", label)
+    return sanitized
 
 
 def ensure_image_exists(
@@ -78,7 +82,10 @@ def ensure_image_exists(
 def get_task_definition(image_uri: str, label: str | None = None):
     try:
         family = "github-runner"
-        resp = config.ecs.describe_task_definition(taskDefinition=f"{family}-{sanitize_image_label(label)}")
+        task_def_name = f"{family}-{sanitize_image_label(label)}"
+        print(f"Getting definition for {task_def_name}")
+        resp = config.ecs.describe_task_definition(taskDefinition=task_def_name)
+        print(f"Found {task_def_name}")
         return resp["taskDefinition"]["taskDefinitionArn"]
     except ClientError as e:
         if e.response['Error']['Code'] == 'ClientException':
@@ -92,6 +99,8 @@ def register_task_definition(image_uri: str, label: str | None = None) -> str:
     family = "github-runner"
     if label:
         family = f"{family}-{sanitize_image_label(label)}"
+
+    print(f"Registering task {family}")
 
     container = {
         "name": "runner",
