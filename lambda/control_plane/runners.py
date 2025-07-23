@@ -106,17 +106,6 @@ def update_runner(runner_id: str, **attrs) -> None:
         ExpressionAttributeValues=values,
     )
 
-
-def record_run(runner_id: str, run_id: str, **attrs) -> None:
-    item = {
-        "runner_id": runner_id,
-        "item_id": f"run#{run_id}",
-        "run_id": run_id,
-    }
-    item.update(attrs)
-    get_table().put_item(Item=item)
-
-
 def update_item(key: dict, **kwargs) -> None:
     get_table().update_item(Key=key, **kwargs)
 

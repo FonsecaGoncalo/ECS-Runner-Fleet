@@ -2,7 +2,7 @@ import json
 import time
 
 import config
-from runners import Runner, register_runner, update_item, record_run
+from runners import Runner, register_runner, update_item, update_runner
 
 
 def handle_status_event(detail) -> None:
@@ -30,25 +30,14 @@ def handle_status_event(detail) -> None:
 
     if status == "running" and run_key:
         runner_rec.started_at = ts
-        record_run(
-            runner_id,
-            run_key,
-            repository=detail.get("repository"),
-            workflow=detail.get("workflow"),
-            job=detail.get("job"),
-            started_at=ts,
-        )
+        update_runner(runner_id,
+                      repository=detail.get("repository"),
+                      workflow=detail.get("workflow"),
+                      job=detail.get("job"),
+                      started_at=ts,
+                      )
     elif status in ("idle", "offline", "completed"):
         runner_rec.completed_at = ts
-        if run_key:
-            try:
-                update_item(
-                    {"runner_id": runner_id, "item_id": f"run#{run_key}"},
-                    UpdateExpression="SET completed_at = :ts",
-                    ExpressionAttributeValues={":ts": ts},
-                )
-            except Exception as exc:
-                print(f"Failed to update run record: {exc}")
 
         if status == "completed" and runner_id:
             task_id = runner_id.split("-")[-1]
