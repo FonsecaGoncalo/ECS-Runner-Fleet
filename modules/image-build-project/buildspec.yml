@@ -5,12 +5,12 @@ phases:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPO_URI
   build:
     commands:
-      - docker build --platform linux/amd64 --build-arg BASE_IMAGE=$BASE_IMAGE -t $REPO_URI:$BASE_IMAGE .
+      - docker build --platform linux/amd64 --build-arg BASE_IMAGE=$BASE_IMAGE -t $REPO_URI:$TAG .
   post_build:
     commands:
-      - docker push $REPO_URI:$BASE_IMAGE
+      - docker push $REPO_URI:$TAG
       - >-
         aws events put-events --entries
-        "[{\"Source\":\"ecs-runner\",\"DetailType\":\"image-build\",\"Detail\":\"{\\\"build_id\\\":\\\"$CODEBUILD_BUILD_ID\\\",\\\"image_uri\\\":\\\"$REPO_URI:$BASE_IMAGE\\\",\\\"status\\\":\\\"SUCCEEDED\\\"}\",\"EventBusName\":\"$EVENT_BUS_NAME\"}]"
+        "[{\"Source\":\"ecs-runner\",\"DetailType\":\"image-build\",\"Detail\":\"{\\\"build_id\\\":\\\"$CODEBUILD_BUILD_ID\\\",\\\"image_uri\\\":\\\"$REPO_URI:$TAG\\\",\\\"status\\\":\\\"SUCCEEDED\\\"}\",\"EventBusName\":\"$EVENT_BUS_NAME\"}]"
 artifacts:
   files: []

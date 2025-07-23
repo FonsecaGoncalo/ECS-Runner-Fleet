@@ -3,9 +3,8 @@ import hashlib
 import hmac
 import json
 
-
 import config
-from image import ensure_image_exists, register_task_definition
+from image import ensure_image_exists, get_task_definition
 from status import handle_status_event
 from github import get_runner_token
 
@@ -50,7 +49,7 @@ def lambda_handler(event, context):
         class_name = item.get("class_name")
         image_label = f"image:{item.get('image_tag')}"
 
-        task_def = register_task_definition(image_uri, image_label)
+        task_def = get_task_definition(image_uri, image_label)
         token = get_runner_token(config.GITHUB_REPO, config.GITHUB_PAT)
 
         overrides = {
@@ -138,13 +137,6 @@ def lambda_handler(event, context):
         print(f"Ignoring action: {action}")
         return {"statusCode": 200, "body": "ignored"}
 
-    # if config.RUNNER_TABLE:
-    #     table = config.dynamodb.Table(config.RUNNER_TABLE)
-    #     resp = table.scan(FilterExpression=Attr("status").eq("idle"))
-    #     if resp.get("Items"):
-    #         print("Idle runner available, skipping new task")
-    #         return {"statusCode": 200, "body": "runner available"}
-
     token = get_runner_token(config.GITHUB_REPO, config.GITHUB_PAT)
 
     job = payload.get("workflow_job", {})
@@ -170,7 +162,7 @@ def lambda_handler(event, context):
             if image_uri is None:
                 print("Image build triggered, exiting")
                 return {"statusCode": 202, "body": "image build"}
-            task_def = register_task_definition(
+            task_def = get_task_definition(
                 image_uri,
                 f"image:{base_image}",
             )
@@ -180,7 +172,7 @@ def lambda_handler(event, context):
             return {"statusCode": 500, "body": "image build failed"}
     else:
         image_uri = f"{config.ECR_REPOSITORY}:{config.RUNNER_IMAGE_TAG}"
-        task_def = register_task_definition(image_uri)
+        task_def = get_task_definition(image_uri)
 
     overrides = {
         "containerOverrides": [

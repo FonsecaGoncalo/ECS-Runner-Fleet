@@ -1,5 +1,7 @@
 import os
 
+from botocore.exceptions import ClientError
+
 import config
 
 
@@ -42,6 +44,7 @@ def ensure_image_exists(
             projectName=config.IMAGE_BUILD_PROJECT,
             environmentVariablesOverride=[
                 {"name": "BASE_IMAGE", "value": base_image, "type": "PLAINTEXT"},
+                {"name": "TAG", "value": tag, "type": "PLAINTEXT"},
                 {
                     "name": "REPOSITORY",
                     "value": repo_name,
@@ -70,6 +73,18 @@ def ensure_image_exists(
 
         print(f"Image build {build_id} started")
         return None
+
+
+def get_task_definition(image_uri: str, label: str | None = None):
+    try:
+        family = "github-runner"
+        resp = config.ecs.describe_task_definition(taskDefinition=f"{family}-{sanitize_image_label(label)}")
+        return resp["taskDefinition"]["taskDefinitionArn"]
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ClientException':
+            return register_task_definition(image_uri, label)
+        else:
+            raise
 
 
 def register_task_definition(image_uri: str, label: str | None = None) -> str:

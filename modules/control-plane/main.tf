@@ -62,6 +62,7 @@ data "aws_iam_policy_document" "lambda_policy" {
 
   statement {
     actions = [
+      "dynamodb:GetItem",
       "dynamodb:Query",
       "dynamodb:Scan",
       "dynamodb:PutItem",
