@@ -1,2 +1,2 @@
 #!/bin/bash
-/home/runner/runner_status.py running
+/home/runner/runner_status.sh running

@@ -2,15 +2,12 @@ ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
+#ENV TZ=Etc/UTC
 
-RUN apt-get update && \
-    apt-get install -y curl tar jq git sudo python3 python3-pip awscli tzdata && \
-    ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
-    dpkg-reconfigure --frontend noninteractive tzdata && \
-    pip3 install boto3 && \
-    useradd -m runner && \
-    rm -rf /var/lib/apt/lists/* \
+RUN apt-get update -y && \
+    apt-get install -y curl tar jq git sudo awscli tzdata
+
+RUN useradd -m runner
 
 WORKDIR /home/runner
 
@@ -25,12 +22,12 @@ RUN ./bin/installdependencies.sh
 
 # Entry point script
 COPY entrypoint.sh /home/runner/entrypoint.sh
-COPY runner_status.py /home/runner/runner_status.py
+COPY runner_status.sh /home/runner/runner_status.sh
 COPY job_started.sh /home/runner/job_started.sh
 COPY job_completed.sh /home/runner/job_completed.sh
 RUN chmod +x /home/runner/entrypoint.sh && chown runner:runner /home/runner/entrypoint.sh
-RUN chmod +x /home/runner/runner_status.py /home/runner/job_started.sh /home/runner/job_completed.sh && \
-    chown runner:runner /home/runner/runner_status.py /home/runner/job_started.sh /home/runner/job_completed.sh
+RUN chmod +x /home/runner/runner_status.sh /home/runner/job_started.sh /home/runner/job_completed.sh && \
+    chown runner:runner /home/runner/runner_status.sh /home/runner/job_started.sh /home/runner/job_completed.sh
 
 ENV ACTIONS_RUNNER_HOOK_JOB_STARTED=/home/runner/job_started.sh \
     ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/home/runner/job_completed.sh

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -23,11 +23,11 @@ else
 fi
 
 # mark runner initially idle
-[ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.py idle || true
+[ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.sh idle || true
 
 cleanup() {
     echo "Removing runner..."
-    [ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.py offline || true
+    [ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.sh offline || true
     ./config.sh remove --unattended --token "$RUNNER_TOKEN"
 }
 

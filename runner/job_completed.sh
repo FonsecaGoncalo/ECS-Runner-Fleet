@@ -1,5 +1,5 @@
-#!/bin/bash
-/home/runner/runner_status.py completed
+#!/bin/sh
+/home/runner/runner_status.sh completed
 
 
 if [ -n "$ECS_CONTAINER_METADATA_URI_V4" ]; then
