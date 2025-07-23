@@ -9,9 +9,9 @@ def sanitize_image_label(label: str) -> str:
 
 
 def ensure_image_exists(
-    base_image: str,
-    runner_labels: str | None = None,
-    class_name: str | None = None,
+        base_image: str,
+        runner_labels: str | None = None,
+        class_name: str | None = None,
 ) -> str | None:
     """Ensure a runner image exists for the requested base image.
 
@@ -41,7 +41,7 @@ def ensure_image_exists(
         build = config.codebuild.start_build(
             projectName=config.IMAGE_BUILD_PROJECT,
             environmentVariablesOverride=[
-                {"name": "BASE_IMAGE", "value": tag, "type": "PLAINTEXT"},
+                {"name": "BASE_IMAGE", "value": base_image, "type": "PLAINTEXT"},
                 {
                     "name": "REPOSITORY",
                     "value": repo_name,
