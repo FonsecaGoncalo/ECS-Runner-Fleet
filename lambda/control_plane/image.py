@@ -111,14 +111,6 @@ def register_task_definition(image_uri: str, label: str | None = None) -> str:
         "environment": [
             {"name": "GITHUB_REPO", "value": config.GITHUB_REPO},
             {"name": "EVENT_BUS_NAME", "value": config.EVENT_BUS_NAME or ""},
-            {
-                "name": "ACTIONS_RUNNER_HOOK_JOB_STARTED",
-                "value": "/home/runner/job_started.sh",
-            },
-            {
-                "name": "ACTIONS_RUNNER_HOOK_JOB_COMPLETED",
-                "value": "/home/runner/job_completed.sh",
-            },
         ],
         "logConfiguration": {
             "logDriver": "awslogs",
