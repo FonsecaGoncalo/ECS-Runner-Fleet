@@ -28,7 +28,7 @@ data "aws_iam_policy_document" "lambda_trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
-      type        = "Service"
+      type = "Service"
       identifiers = ["lambda.amazonaws.com"]
     }
   }
@@ -42,6 +42,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
 data "aws_iam_policy_document" "lambda_policy" {
   statement {
     actions = [
+      "ecs:StopTask",
       "ecs:RunTask",
       "ecs:DescribeTasks",
       "ecs:DescribeTaskDefinition",
@@ -72,17 +73,17 @@ data "aws_iam_policy_document" "lambda_policy" {
   }
 
   statement {
-    actions   = ["ssm:GetParameter"]
+    actions = ["ssm:GetParameter"]
     resources = [aws_ssm_parameter.class_sizes.arn]
   }
 
   statement {
-    actions   = ["ecr:DescribeImages"]
+    actions = ["ecr:DescribeImages"]
     resources = ["*"]
   }
 
   statement {
-    actions   = ["codebuild:StartBuild"]
+    actions = ["codebuild:StartBuild"]
     resources = ["*"]
   }
 }
@@ -99,7 +100,7 @@ resource "aws_cloudwatch_event_rule" "runner_status" {
   name           = "runner-status"
   event_bus_name = var.event_bus_name
   event_pattern = jsonencode({
-    source      = ["ecs-runner"],
+    source = ["ecs-runner"],
     detail-type = ["runner-status"]
   })
 }
@@ -108,7 +109,7 @@ resource "aws_cloudwatch_event_rule" "image_build" {
   name           = "image-build"
   event_bus_name = var.event_bus_name
   event_pattern = jsonencode({
-    source      = ["ecs-runner"],
+    source = ["ecs-runner"],
     detail-type = ["image-build"]
   })
 }
@@ -151,8 +152,8 @@ data "archive_file" "lambda_zip" {
 }
 
 resource "aws_ssm_parameter" "class_sizes" {
-  name  = "/ecs-runner/class-sizes"
-  type  = "String"
+  name = "/ecs-runner/class-sizes"
+  type = "String"
   value = jsonencode(var.runner_class_sizes)
 }
 
@@ -167,8 +168,8 @@ resource "aws_lambda_function" "control_plane" {
   environment {
     variables = {
       CLUSTER               = var.ecs_cluster
-      SUBNETS               = join(",", var.ecs_subnet_ids)
-      SECURITY_GROUPS       = join(",", var.security_groups)
+      SUBNETS = join(",", var.ecs_subnet_ids)
+      SECURITY_GROUPS = join(",", var.security_groups)
       GITHUB_PAT            = var.github_pat
       GITHUB_REPO           = var.github_repo
       GITHUB_WEBHOOK_SECRET = var.webhook_secret

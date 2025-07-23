@@ -39,7 +39,7 @@ def handle_status_event(detail) -> None:
                 "started_at": ts,
             }
         )
-    elif status in ("idle", "offline"):
+    elif status in ("idle", "offline", "completed"):
         state_item["completed_at"] = ts
         if run_key:
             try:
@@ -50,5 +50,16 @@ def handle_status_event(detail) -> None:
                 )
             except Exception as exc:
                 print(f"Failed to update run record: {exc}")
+
+        if status == "completed" and runner_id:
+            task_id = runner_id.split("-")[-1]
+            try:
+                config.ecs.stop_task(
+                    cluster=config.CLUSTER,
+                    task=task_id,
+                    reason="runner job completed",
+                )
+            except Exception as exc:
+                print(f"Failed to stop task {task_id}: {exc}")
 
     table.put_item(Item=state_item)
