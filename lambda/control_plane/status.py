@@ -2,6 +2,7 @@ import json
 import time
 
 import config
+from db import put_item, update_item
 
 
 def handle_status_event(detail) -> None:
@@ -16,7 +17,6 @@ def handle_status_event(detail) -> None:
     ts = detail.get("timestamp", int(time.time()))
     run_key = detail.get("workflow_job_id")
 
-    table = config.dynamodb.Table(config.RUNNER_TABLE)
     state_item = {
         "runner_id": runner_id,
         "item_id": "state",
@@ -28,8 +28,8 @@ def handle_status_event(detail) -> None:
 
     if status == "running" and run_key:
         state_item["started_at"] = ts
-        table.put_item(
-            Item={
+        put_item(
+            item={
                 "runner_id": runner_id,
                 "item_id": f"run#{run_key}",
                 "run_id": run_key,
@@ -43,8 +43,8 @@ def handle_status_event(detail) -> None:
         state_item["completed_at"] = ts
         if run_key:
             try:
-                table.update_item(
-                    Key={"runner_id": runner_id, "item_id": f"run#{run_key}"},
+                update_item(
+                    {"runner_id": runner_id, "item_id": f"run#{run_key}"},
                     UpdateExpression="SET completed_at = :ts",
                     ExpressionAttributeValues={":ts": ts},
                 )
@@ -62,4 +62,4 @@ def handle_status_event(detail) -> None:
             except Exception as exc:
                 print(f"Failed to stop task {task_id}: {exc}")
 
-    table.put_item(Item=state_item)
+    put_item(state_item)

@@ -1,9 +1,8 @@
 import os
 import re
 
-from botocore.exceptions import ClientError
-
 import config
+from db import put_item
 
 
 def sanitize_image_label(label: str) -> str:
@@ -63,7 +62,6 @@ def ensure_image_exists(
         )
         build_id = build["build"]["id"]
 
-        table = config.dynamodb.Table(config.RUNNER_TABLE)
         item = {
             "runner_id": build_id,
             "item_id": "state",
@@ -73,63 +71,7 @@ def ensure_image_exists(
         }
         if class_name:
             item["class_name"] = class_name
-        table.put_item(Item=item)
+        put_item(item)
 
         print(f"Image build {build_id} started")
         return None
-
-
-def get_task_definition(image_uri: str, label: str | None = None):
-    try:
-        family = "github-runner"
-        task_def_name = f"{family}-{sanitize_image_label(label)}"
-        print(f"Getting definition for {task_def_name}")
-        resp = config.ecs.describe_task_definition(taskDefinition=task_def_name)
-        print(f"Found {task_def_name}")
-        return resp["taskDefinition"]["taskDefinitionArn"]
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'ClientException':
-            return register_task_definition(image_uri, label)
-        else:
-            raise
-
-
-def register_task_definition(image_uri: str, label: str | None = None) -> str:
-    """Register a task definition for the runner image."""
-    family = "github-runner"
-    if label:
-        family = f"{family}-{sanitize_image_label(label)}"
-
-    print(f"Registering task {family}")
-
-    container = {
-        "name": "runner",
-        "image": image_uri,
-        "cpu": 1024,
-        "memory": 2048,
-        "essential": True,
-        "environment": [
-            {"name": "GITHUB_REPO", "value": config.GITHUB_REPO},
-            {"name": "EVENT_BUS_NAME", "value": config.EVENT_BUS_NAME or ""},
-        ],
-        "logConfiguration": {
-            "logDriver": "awslogs",
-            "options": {
-                "awslogs-group": config.LOG_GROUP_NAME,
-                "awslogs-region": os.environ.get("AWS_REGION", "us-east-1"),
-                "awslogs-stream-prefix": "runner",
-            },
-        },
-    }
-
-    resp = config.ecs.register_task_definition(
-        family=family,
-        networkMode="awsvpc",
-        executionRoleArn=config.EXECUTION_ROLE_ARN,
-        taskRoleArn=config.TASK_ROLE_ARN,
-        requiresCompatibilities=["FARGATE"],
-        cpu="1024",
-        memory="2048",
-        containerDefinitions=[container],
-    )
-    return resp["taskDefinition"]["taskDefinitionArn"]
