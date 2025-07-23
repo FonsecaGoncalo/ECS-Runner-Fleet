@@ -19,3 +19,8 @@ variable "ecr_url" {
   description = "ECR url"
   type        = string
 }
+
+variable "event_bus_name" {
+  description = "Name of the EventBridge event bus"
+  type        = string
+}

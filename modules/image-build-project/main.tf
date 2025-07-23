@@ -42,6 +42,11 @@ resource "aws_iam_role_policy" "codebuild" {
         Effect   = "Allow",
         Action   = ["s3:GetObject"],
         Resource = "${aws_s3_bucket.runner_source.arn}/*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["events:PutEvents"],
+        Resource = "*"
       }
     ]
   })
@@ -97,6 +102,11 @@ resource "aws_codebuild_project" "builder" {
     environment_variable {
       name  = "REPO_URI"
       value = var.ecr_url
+    }
+
+    environment_variable {
+      name  = "EVENT_BUS_NAME"
+      value = var.event_bus_name
     }
   }
 

@@ -9,5 +9,8 @@ phases:
   post_build:
     commands:
       - docker push $REPO_URI:$BASE_IMAGE
+      - >-
+        aws events put-events --entries
+        "[{\"Source\":\"ecs-runner\",\"DetailType\":\"image-build\",\"Detail\":\"{\\\"build_id\\\":\\\"$CODEBUILD_BUILD_ID\\\",\\\"image_uri\\\":\\\"$REPO_URI:$BASE_IMAGE\\\",\\\"status\\\":\\\"SUCCEEDED\\\"}\",\"EventBusName\":\"$EVENT_BUS_NAME\"}]"
 artifacts:
   files: []

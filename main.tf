@@ -21,12 +21,13 @@ module "control_plane" {
 }
 
 module "image_build_project" {
-  count        = var.image_build_project == "" ? 0 : 1
-  source       = "./modules/image-build-project"
-  project_name = var.image_build_project
-  github_repo  = var.github_repo
-  github_pat   = var.github_pat
-  ecr_url      = module.ecs_fleet.repository_url
+  count          = var.image_build_project == "" ? 0 : 1
+  source         = "./modules/image-build-project"
+  project_name   = var.image_build_project
+  github_repo    = var.github_repo
+  github_pat     = var.github_pat
+  ecr_url        = module.ecs_fleet.repository_url
+  event_bus_name = var.event_bus_name
 }
 
 output "webhook_url" {

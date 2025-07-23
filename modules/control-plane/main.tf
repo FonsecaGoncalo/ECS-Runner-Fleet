@@ -103,10 +103,26 @@ resource "aws_cloudwatch_event_rule" "runner_status" {
   })
 }
 
+resource "aws_cloudwatch_event_rule" "image_build" {
+  name           = "image-build"
+  event_bus_name = var.event_bus_name
+  event_pattern = jsonencode({
+    source      = ["ecs-runner"],
+    detail-type = ["image-build"]
+  })
+}
+
 resource "aws_cloudwatch_event_target" "runner_status" {
   rule           = aws_cloudwatch_event_rule.runner_status.name
   event_bus_name = var.event_bus_name
   target_id      = "control-plane"
+  arn            = aws_lambda_function.control_plane.arn
+}
+
+resource "aws_cloudwatch_event_target" "image_build" {
+  rule           = aws_cloudwatch_event_rule.image_build.name
+  event_bus_name = var.event_bus_name
+  target_id      = "control-plane-image-build"
   arn            = aws_lambda_function.control_plane.arn
 }
 
@@ -116,6 +132,14 @@ resource "aws_lambda_permission" "allow_events" {
   function_name = aws_lambda_function.control_plane.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.runner_status.arn
+}
+
+resource "aws_lambda_permission" "allow_image_events" {
+  statement_id  = "AllowEventBridgeInvokeImage"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.control_plane.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.image_build.arn
 }
 
 

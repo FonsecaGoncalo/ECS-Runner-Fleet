@@ -31,6 +31,7 @@ ecr = boto3.client("ecr") if ECR_REPOSITORY else None
 
 _class_sizes = None
 
+
 def get_class_sizes():
     """Return cached runner class size definitions."""
     global _class_sizes
