@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from aws_lambda_powertools import Logger, Tracer
 
-from .config import Settings
-from .models import EventType
-from .services.image_build_service import ImageBuildService
-from .services.status_service import StatusService
-from .services.webhook_service import WebhookService
+from config import Settings
+from models import EventType
+from services.image_build_service import ImageBuildService
+from services.status_service import StatusService
+from services.webhook_service import WebhookService
 
 logger = Logger(service="control-plane")
 tracer = Tracer(service="control-plane")
