@@ -1,32 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
 import time
-
-import config
-
-_table = None
-
-
-def get_table():
-    """Return cached DynamoDB table for runner state."""
-    global _table
-    if _table is None:
-        if not config.RUNNER_TABLE:
-            raise RuntimeError("RUNNER_TABLE environment variable not set")
-        _table = config.dynamodb.Table(config.RUNNER_TABLE)
-    return _table
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
 
 
-def get_item(key: dict) -> dict | None:
-    return get_table().get_item(Key=key).get("Item")
+class EventType(str, Enum):
+    RUNNER_STATUS = "runner-status"
+    IMAGE_BUILD = "image-build"
+    WEBHOOK = "workflow_job"
 
 
 @dataclass
 class Runner:
-    """Representation of a single runner instance."""
-
     id: str
     state: str
     labels: str
@@ -37,7 +24,6 @@ class Runner:
     runner_class: Optional[str] = None
     workflow_id: Optional[str] = None
     job_id: Optional[str] = None
-
     job_status: Optional[str] = None
 
     def to_item(self) -> dict:
@@ -80,44 +66,3 @@ class Runner:
             job_id=item.get("job_id"),
             job_status=item.get("job_status"),
         )
-
-
-def get_runner(runner_id: str) -> Optional[Runner]:
-    item = get_table().get_item(
-        Key={"runner_id": runner_id, "item_id": "state"}
-    ).get("Item")
-    return Runner.from_item(item) if item else None
-
-
-def register_runner(runner: Runner) -> None:
-    get_table().put_item(Item=runner.to_item())
-
-
-def update_runner(runner_id: str, **attrs) -> None:
-    names = {}
-    values = {}
-    updates = []
-    for idx, (key, val) in enumerate(attrs.items()):
-        name = f"#n{idx}"
-        value = f":v{idx}"
-        names[name] = key
-        values[value] = val
-        updates.append(f"{name} = {value}")
-    expr = "SET " + ", ".join(updates)
-    get_table().update_item(
-        Key={"runner_id": runner_id, "item_id": "state"},
-        UpdateExpression=expr,
-        ExpressionAttributeNames=names,
-        ExpressionAttributeValues=values,
-    )
-
-def update_item(key: dict, **kwargs) -> None:
-    get_table().update_item(Key=key, **kwargs)
-
-
-def delete_runner(runner_id: str) -> None:
-    get_table().delete_item(Key={"runner_id": runner_id, "item_id": "state"})
-
-
-def delete_item(key: dict) -> None:
-    get_table().delete_item(Key=key)

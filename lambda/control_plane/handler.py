@@ -1,20 +1,36 @@
-import json
+from __future__ import annotations
 
-from status import handle_status_event
-from image_build import handle_image_build_event
-from webhook import handle_webhook_event
+from aws_lambda_powertools import Logger, Tracer
+
+from .config import Settings
+from .models import EventType
+from .services.image_build_service import ImageBuildService
+from .services.status_service import StatusService
+from .services.webhook_service import WebhookService
+
+logger = Logger(service="control-plane")
+tracer = Tracer(service="control-plane")
+settings = Settings()
+
+status_service = StatusService(settings, logger, tracer)
+image_build_service = ImageBuildService(settings, logger, tracer)
+webhook_service = WebhookService(settings, logger, tracer)
 
 
-def lambda_handler(event, context):
-    """Entry point for the runner control plane Lambda."""
-    print("Received event:", json.dumps(event))
-
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event: dict, context) -> dict:
     detail_type = event.get("detail-type")
-    if detail_type == "runner-status":
-        handle_status_event(event.get("detail"))
-        return {"statusCode": 200, "body": "status updated"}
-
-    if detail_type == "image-build":
-        return handle_image_build_event(event.get("detail", {}))
-
-    return handle_webhook_event(event)
+    try:
+        if detail_type == EventType.RUNNER_STATUS.value:
+            status_service.handle_event(event.get("detail", {}))
+            return {"statusCode": 200, "body": "status updated"}
+        if detail_type == EventType.IMAGE_BUILD.value:
+            return image_build_service.handle_event(event.get("detail", {}))
+        return webhook_service.handle_event(event)
+    except ValueError as exc:
+        logger.exception("Invalid request")
+        return {"statusCode": 400, "body": str(exc)}
+    except Exception:
+        logger.exception("Unhandled error")
+        return {"statusCode": 500, "body": "internal error"}

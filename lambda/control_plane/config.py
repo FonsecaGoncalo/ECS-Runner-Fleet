@@ -1,49 +1,64 @@
+from __future__ import annotations
+
 import json
-import os
+from functools import cache
+from typing import Any, List
 
 import boto3
-
-# boto3 clients
-ecs = boto3.client("ecs")
-dynamodb = boto3.resource("dynamodb")
-ssm = boto3.client("ssm")
-
-# environment configuration
-CLUSTER = os.environ.get("CLUSTER", "runner-cluster")
-SUBNETS = os.environ.get("SUBNETS", "").split(",")
-SECURITY_GROUPS = os.environ.get("SECURITY_GROUPS", "").split(",")
-GITHUB_PAT = os.environ.get("GITHUB_PAT")
-GITHUB_REPO = os.environ.get("GITHUB_REPO")
-WEBHOOK_SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET")
-RUNNER_TABLE = os.environ.get("RUNNER_TABLE")
-CLASS_SIZES_PARAM = os.environ.get("CLASS_SIZES_PARAM")
-EXECUTION_ROLE_ARN = os.environ.get("EXECUTION_ROLE_ARN")
-TASK_ROLE_ARN = os.environ.get("TASK_ROLE_ARN")
-LOG_GROUP_NAME = os.environ.get("LOG_GROUP_NAME")
-EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME")
-
-ECR_REPOSITORY = os.environ.get("RUNNER_REPOSITORY_URL")
-RUNNER_IMAGE_TAG = os.environ.get("RUNNER_IMAGE_TAG", "latest")
-IMAGE_BUILD_PROJECT = os.environ.get("IMAGE_BUILD_PROJECT")
-
-codebuild = boto3.client("codebuild") if IMAGE_BUILD_PROJECT else None
-ecr = boto3.client("ecr") if ECR_REPOSITORY else None
-
-_class_sizes = None
+from botocore.config import Config as BotoConfig
+from pydantic_settings import BaseSettings
+from pydantic import Field, validator
 
 
-def get_class_sizes():
-    """Return cached runner class size definitions."""
-    global _class_sizes
-    if _class_sizes is not None:
-        return _class_sizes
-    if not CLASS_SIZES_PARAM:
-        _class_sizes = {}
-        return _class_sizes
-    try:
-        resp = ssm.get_parameter(Name=CLASS_SIZES_PARAM)
-        _class_sizes = json.loads(resp["Parameter"]["Value"])
-    except Exception as exc:
-        print(f"Failed to load class sizes: {exc}")
-        _class_sizes = {}
-    return _class_sizes
+class Settings(BaseSettings):
+    """Environment configuration loaded from variables."""
+
+    cluster: str = Field(..., env="CLUSTER")
+    subnets: List[str] = Field(..., env="SUBNETS")
+    security_groups: List[str] = Field(..., env="SECURITY_GROUPS")
+    github_pat: str = Field(..., env="GITHUB_PAT")
+    github_repo: str = Field(..., env="GITHUB_REPO")
+    webhook_secret: str = Field(..., env="GITHUB_WEBHOOK_SECRET")
+    runner_table: str = Field(..., env="RUNNER_TABLE")
+    class_sizes_param: str | None = Field(None, env="CLASS_SIZES_PARAM")
+    execution_role_arn: str = Field(..., env="EXECUTION_ROLE_ARN")
+    task_role_arn: str = Field(..., env="TASK_ROLE_ARN")
+    log_group_name: str = Field(..., env="LOG_GROUP_NAME")
+    event_bus_name: str = Field(..., env="EVENT_BUS_NAME")
+    ecr_repository_url: str = Field(..., env="RUNNER_REPOSITORY_URL")
+    runner_image_tag: str = Field("latest", env="RUNNER_IMAGE_TAG")
+    image_build_project: str | None = Field(None, env="IMAGE_BUILD_PROJECT")
+
+    @validator("subnets", "security_groups", pre=True)
+    def _split_csv(cls, v: str | List[str]) -> List[str]:
+        if isinstance(v, str):
+            return [p for p in v.split(",") if p]
+        return v
+
+    class Config:
+        case_sensitive = False
+        env_file = ".env"
+
+
+_session = boto3.Session()
+_retry_cfg = BotoConfig(retries={"max_attempts": 5, "mode": "standard"})
+
+
+def client(service: str):
+    """Create a boto3 client with retry config."""
+    return _session.client(service, config=_retry_cfg)
+
+
+def resource(service: str):
+    """Create a boto3 resource with retry config."""
+    return _session.resource(service, config=_retry_cfg)
+
+
+@cache
+def get_class_sizes(settings: Settings) -> dict[str, Any]:
+    """Fetch and cache runner class size definitions from SSM."""
+    if not settings.class_sizes_param:
+        return {}
+    ssm_client = client("ssm")
+    resp = ssm_client.get_parameter(Name=settings.class_sizes_param)
+    return json.loads(resp["Parameter"]["Value"])
