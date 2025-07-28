@@ -50,7 +50,12 @@ def handle_webhook_event(event):
 
     job = payload.get("workflow_job", {})
     job_labels = job.get("labels", [])
-    runner_labels = ",".join(job_labels) if job_labels else "default-runner"
+
+    if not job_labels:
+        print(f"Missing labels for workflow job: {job}")
+        return {"statusCode": 400, "body": "missing labels"}
+
+    runner_labels = ",".join(job_labels)
 
     base_image = None
     class_name = None

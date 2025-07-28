@@ -38,6 +38,8 @@ class Runner:
     workflow_id: Optional[str] = None
     job_id: Optional[str] = None
 
+    job_status: Optional[str] = None
+
     def to_item(self) -> dict:
         item = {
             "runner_id": self.id,
@@ -59,6 +61,8 @@ class Runner:
             item["workflow_job_id"] = self.workflow_id
         if self.job_id:
             item["job_id"] = self.job_id
+        if self.job_status:
+            item["job_status"] = self.job_status
         return item
 
     @classmethod
@@ -74,6 +78,7 @@ class Runner:
             runner_class=item.get("class_name"),
             workflow_id=item.get("workflow_job_id"),
             job_id=item.get("job_id"),
+            job_status=item.get("job_status"),
         )
 
 

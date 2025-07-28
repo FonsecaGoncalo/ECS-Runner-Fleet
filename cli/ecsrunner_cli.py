@@ -116,22 +116,31 @@ def list_runners():
 
     columns = [
         ("RUNNER_ID", "runner_id"),
-        ("STATUS", "status"),
+        ("RUNNER_STATUS", "status"),
+        ("JOB_STATUS", "job_status"),
         ("JOB_ID", "workflow_job_id"),
         ("STARTED", "started_at"),
         ("COMPLETED", "completed_at"),
     ]
 
-    def color_status(text: str) -> str:
+    def color_job_status(text: str) -> str:
         raw = text.strip()
         color = {
             "running": "green",
             "idle": "yellow",
-            "stopped": "red",
+            "completed": "blue",
         }.get(raw.lower())
         return click.style(text, fg=color) if color else text
 
-    stylers = {"status": color_status}
+    def color_runner_status(text: str) -> str:
+        raw = text.strip()
+        color = {
+            "online": "green",
+            "offline": "red",
+        }.get(raw.lower())
+        return click.style(text, fg=color) if color else text
+
+    stylers = {"status": color_runner_status, "job_status": color_job_status}
 
     click.echo(_format_table(items, columns, stylers))
 
@@ -175,9 +184,9 @@ def mark_idle(runner_id):
     try:
         table.update_item(
             Key={"runner_id": runner_id},
-            UpdateExpression="SET #s = :idle REMOVE workflow_job_id, started_at, completed_at",
-            ExpressionAttributeNames={"#s": "status"},
-            ExpressionAttributeValues={":idle": "idle"},
+            UpdateExpression="SET #s = :online, #j = :idle REMOVE workflow_job_id, started_at, completed_at",
+            ExpressionAttributeNames={"#s": "status", "#j": "job_status"},
+            ExpressionAttributeValues={":idle": "idle", ":online": "online"},
         )
     except ClientError as e:
         raise click.ClickException(str(e))
