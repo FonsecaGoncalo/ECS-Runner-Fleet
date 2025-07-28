@@ -1,2 +1,2 @@
 #!/bin/sh
-/home/runner/runner_status.sh completed
+/home/runner/runner_status.sh COMPLETED

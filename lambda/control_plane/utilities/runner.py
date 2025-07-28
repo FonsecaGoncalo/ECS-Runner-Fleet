@@ -102,7 +102,7 @@ def run_runner_task(
         ]
     }
     sizes = get_class_sizes(settings)
-    if class_name and class_name in sizes:
+    if class_name in sizes:
         cpu = sizes[class_name].get("cpu")
         memory = sizes[class_name].get("memory")
         overrides["cpu"] = str(cpu)

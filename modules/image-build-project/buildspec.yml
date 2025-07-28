@@ -11,6 +11,6 @@ phases:
       - docker push $REPO_URI:$TAG
       - >-
         aws events put-events --entries
-        "[{\"Source\":\"ecs-runner\",\"DetailType\":\"image-build\",\"Detail\":\"{\\\"build_id\\\":\\\"$CODEBUILD_BUILD_ID\\\",\\\"image_uri\\\":\\\"$REPO_URI:$TAG\\\",\\\"status\\\":\\\"SUCCEEDED\\\"}\",\"EventBusName\":\"$EVENT_BUS_NAME\"}]"
+        "[{\"Source\":\"ecs-runner\",\"DetailType\":\"image-build\",\"Detail\":\"{\\\"build_id\\\":\\\"$CODEBUILD_BUILD_ID\\\",\\\"runner_id\\\":\\\"RUNNER_ID\\\",\\\"image_uri\\\":\\\"$REPO_URI:$TAG\\\",\\\"status\\\":\\\"SUCCEEDED\\\"}\",\"EventBusName\":\"$EVENT_BUS_NAME\"}]"
 artifacts:
   files: []

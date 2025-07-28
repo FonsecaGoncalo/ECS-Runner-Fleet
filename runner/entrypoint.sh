@@ -27,7 +27,7 @@ fi
 
 cleanup() {
     echo "Removing runner..."
-    [ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.sh offline || true
+    [ -n "$EVENT_BUS_NAME" ] && /home/runner/runner_status.sh OFFLINE || true
     ./config.sh remove --unattended --token "$RUNNER_TOKEN"
 }
 

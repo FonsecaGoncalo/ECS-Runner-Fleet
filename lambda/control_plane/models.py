@@ -12,10 +12,19 @@ class EventType(str, Enum):
     WEBHOOK = "workflow_job"
 
 
+class RunnerState(str, Enum):
+    FAILED = "FAILED"
+    WAITING_FOR_JOB = "WAITING_FOR_JOB"
+    RUNNING = "RUNNING"
+    IMAGE_CREATING = "IMAGE_CREATING"
+    STARTING = "STARTING"
+    OFFLINE = "OFFLINE"
+
+
 @dataclass
 class Runner:
     id: str
-    state: str
+    state: RunnerState
     labels: str
     image: Optional[str] = None
     created_at: int = field(default_factory=lambda: int(time.time()))
@@ -25,6 +34,7 @@ class Runner:
     workflow_id: Optional[str] = None
     job_id: Optional[str] = None
     job_status: Optional[str] = None
+    task_id: Optional[str] = None
 
     def to_item(self) -> dict:
         item = {
@@ -49,6 +59,8 @@ class Runner:
             item["job_id"] = self.job_id
         if self.job_status:
             item["job_status"] = self.job_status
+        if self.task_id:
+            item["task_id"] = self.task_id
         return item
 
     @classmethod
@@ -65,4 +77,5 @@ class Runner:
             workflow_id=item.get("workflow_job_id"),
             job_id=item.get("job_id"),
             job_status=item.get("job_status"),
+            task_id=item.get("task_id"),
         )
