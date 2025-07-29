@@ -126,9 +126,6 @@ class RunnerController:
                 extra={"task_id": task_id, "error": str(exc)},
             )
 
-
-
-
     def _build_image_async(self, base_image: str, tag: str, runner_id: str) -> None:
         """Kick off a CodeBuild project to build & push a new runner image."""
         if not self.codebuild:

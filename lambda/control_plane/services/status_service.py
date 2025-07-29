@@ -6,9 +6,9 @@ from typing import Any, Dict
 
 from aws_lambda_powertools import Logger, Tracer
 
-from ..config import Settings, client, resource
-from ..models import Runner, RunnerState
-from ..runner_controller import RunnerController
+from config import Settings, client, resource
+from models import Runner, RunnerState
+from runner_controller import RunnerController
 
 
 class StatusService:

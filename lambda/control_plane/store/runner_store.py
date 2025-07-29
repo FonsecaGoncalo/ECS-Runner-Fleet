@@ -1,10 +1,9 @@
 from datetime import time
 from typing import Optional
+from ulid import ULID
 
-import ulid
-
-from ..config import Settings, resource
-from ..models import Runner, RunnerState
+from config import Settings, resource
+from models import Runner, RunnerState
 
 
 class RunnerStore:
@@ -16,7 +15,7 @@ class RunnerStore:
 
     def new_runner(self, runner_labels, tag, class_name) -> Runner:
         runner = Runner(
-            id=str(ulid.ulid()),
+            id=str(ULID()),
             state=RunnerState.STARTING,
             labels=runner_labels,
             image=tag,

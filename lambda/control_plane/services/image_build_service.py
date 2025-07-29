@@ -4,8 +4,8 @@ from typing import Any, Dict
 
 from aws_lambda_powertools import Logger, Tracer
 
-from ..config import Settings, resource
-from ..runner_controller import RunnerController
+from config import Settings, resource
+from runner_controller import RunnerController
 
 
 class ImageBuildService:

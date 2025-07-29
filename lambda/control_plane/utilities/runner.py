@@ -7,8 +7,8 @@ from typing import Any, Dict, Optional
 
 from botocore.exceptions import ClientError
 
-from ..config import Settings, client, get_class_sizes
-from .images import sanitize_image_label
+from config import Settings, client, get_class_sizes
+from utilities.images import sanitize_image_label
 
 
 def get_runner_token(settings: Settings) -> str:
