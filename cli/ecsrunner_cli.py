@@ -1,336 +1,208 @@
-"""Command line tool to manage ECS-based GitHub Actions runners."""
 import json
 import os
-import shutil
-import subprocess
-from typing import Callable, Dict
+from datetime import datetime
+from functools import wraps
+from typing import Callable, Dict, List, Optional
 
 import boto3
 import click
 from botocore.exceptions import ClientError
 
 
-def _get_table():
-    """Return DynamoDB table for runner state."""
-    table_name = os.environ.get("RUNNER_STATE_TABLE")
-    if not table_name:
-        raise click.ClickException("RUNNER_STATE_TABLE environment variable is not set")
-    dynamodb = boto3.resource("dynamodb")
-    return dynamodb.Table(table_name)
+# ---- Helpers for AWS and DynamoDB access ----
+
+def aws_session(profile: Optional[str], region: Optional[str]) -> boto3.Session:
+    """Create a boto3 Session using optional profile and region."""
+    session_args = {}
+    if profile:
+        session_args['profile_name'] = profile
+    if region:
+        session_args['region_name'] = region
+    return boto3.Session(**session_args)
 
 
-def _ecs_client():
-    """Return boto3 ECS client."""
-    return boto3.client("ecs")
+def get_dynamo_table(table_name: str, session: boto3.Session):
+    """Return a DynamoDB Table resource."""
+    return session.resource('dynamodb').Table(table_name)
 
 
-def _get_class_sizes():
-    """Return dict of runner class sizes from SSM."""
-    param_name = os.environ.get("CLASS_SIZES_PARAM")
-    if not param_name:
-        raise click.ClickException("CLASS_SIZES_PARAM environment variable is not set")
-    ssm = boto3.client("ssm")
+def get_ssm_param(param_name: str, session: boto3.Session) -> Dict[str, Dict[str, int]]:
+    """Fetch JSON parameter from SSM."""
     try:
-        resp = ssm.get_parameter(Name=param_name)
-        return json.loads(resp["Parameter"]["Value"])
+        client = session.client('ssm')
+        resp = client.get_parameter(Name=param_name, WithDecryption=True)
+        return json.loads(resp['Parameter']['Value'])
     except ClientError as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(f"Failed to fetch SSM parameter {param_name}: {e}")
 
 
-def _format_table(
-        items,
-        columns,
-        stylers: Dict[str, Callable[[str], str]] | None = None,
-):
-    """Return a simple table string for a list of dicts.
+def get_ecs_client(session: boto3.Session):
+    return session.client('ecs')
 
-    Parameters
-    ----------
-    items: list of dict
-        Items to render.
-    columns: list of tuple
-        Sequence of ``(header, key)`` column definitions.
-    """
+# ---- Table formatter ----
 
+def format_table(
+    items: List[Dict],
+    columns: List[tuple],
+    stylers: Optional[Dict[str, Callable[[str], str]]] = None
+) -> str:
+    """Render a text table with optional styling."""
     if not items:
-        headers = [c[0] for c in columns]
-        return "  ".join(click.style(h, bold=True) for h in headers)
+        return '  '.join(click.style(head, bold=True) for head, _ in columns)
 
-    widths = [len(col[0]) for col in columns]
+    # compute column widths
+    widths = [len(head) for head, _ in columns]
     for item in items:
-        for idx, (_, key) in enumerate(columns):
-            widths[idx] = max(widths[idx], len(str(item.get(key, ""))))
+        for i, (_, key) in enumerate(columns):
+            widths[i] = max(widths[i], len(str(item.get(key, ''))))
 
-    header = "  ".join(col[0].ljust(widths[i]) for i, col in enumerate(columns))
+    header = '  '.join(head.ljust(widths[i]) for i, (head, _) in enumerate(columns))
     rows = [click.style(header, bold=True)]
     for item in items:
         parts = []
-        for i, (header_name, key) in enumerate(columns):
-            raw = str(item.get(key, ""))
-            padded = raw.ljust(widths[i])
+        for i, (_, key) in enumerate(columns):
+            val = str(item.get(key, ''))
+            text = val.ljust(widths[i])
             if stylers and key in stylers:
-                padded = stylers[key](padded)
-            parts.append(padded)
-        rows.append("  ".join(parts))
-    return "\n".join(rows)
+                text = stylers[key](text)
+            parts.append(text)
+        rows.append('  '.join(parts))
+    return '\n'.join(rows)
 
+# ---- Click context ----
 
-# Main CLI group ---------------------------------------------------------
+class Context:
+    def __init__(self, profile: Optional[str], region: Optional[str]):
+        self.session = aws_session(profile, region)
+        self.region = region
+        # Environment-backed defaults
+        self.table_name = os.getenv('RUNNER_TABLE') or os.getenv('RUNNER_STATE_TABLE')
+        if not self.table_name:
+            raise click.ClickException('RUNNER_TABLE environment variable must be set')
+        self.ssm_param = os.getenv('CLASS_SIZES_PARAM')
 
-@click.group()
-def cli():
+pass_ctx = click.make_pass_decorator(Context)
+
+def common_options(f):
+    @click.option('--profile', '-p', help='AWS CLI profile to use')
+    @click.option('--region', '-r', help='AWS region')
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+    return wrapper
+
+# ---- CLI definition ----
+@click.group(context_settings={'help_option_names': ['-h', '--help']})
+@common_options
+@click.pass_context
+def cli(ctx, profile, region):
     """Manage GitHub Actions runners on ECS."""
-    pass
+    ctx.obj = Context(profile, region)
 
+# ---- Class sizes ----
+@cli.command('list-class-sizes')
+@pass_ctx
+def list_class_sizes(ctx):
+    """List available runner class sizes from SSM."""
+    if not ctx.ssm_param:
+        raise click.ClickException('CLASS_SIZES_PARAM not set')
+    sizes = get_ssm_param(ctx.ssm_param, ctx.session)
+    items = [{'class': name, **vals} for name, vals in sizes.items()]
+    columns = [('CLASS', 'class'), ('CPU', 'cpu'), ('MEMORY', 'memory')]
+    click.echo(format_table(items, columns))
 
-@cli.command("list-class-sizes")
-def list_class_sizes():
-    """List available runner class sizes."""
-    sizes = _get_class_sizes()
-    items = [{"class": name, **vals} for name, vals in sizes.items()]
-    columns = [("CLASS", "class"), ("CPU", "cpu"), ("MEMORY", "memory")]
-    click.echo(_format_table(items, columns))
-
-
-# Runner commands --------------------------------------------------------
-
+# ---- Runner commands ----
 @cli.group()
 def runners():
-    """Commands related to individual runner tasks."""
+    """Commands related to individual runners."""
     pass
 
-
-@runners.command("list")
-def list_runners():
-    """List all runners and their statuses."""
-    table = _get_table()
-    items = []
+@runners.command('list')
+@pass_ctx
+def list_runners(ctx):
+    """List all runners and their current status."""
+    table = get_dynamo_table(ctx.table_name, ctx.session)
     try:
         resp = table.scan()
-        items.extend(resp.get("Items", []))
-        while resp.get("LastEvaluatedKey"):
-            resp = table.scan(ExclusiveStartKey=resp["LastEvaluatedKey"])
-            items.extend(resp.get("Items", []))
+        items = resp.get('Items', [])
+        while resp.get('LastEvaluatedKey'):
+            resp = table.scan(ExclusiveStartKey=resp['LastEvaluatedKey'])
+            items.extend(resp.get('Items', []))
     except ClientError as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(f'DynamoDB scan failed: {e}')
 
     columns = [
-        ("RUNNER_ID", "runner_id"),
-        ("RUNNER_STATUS", "status"),
-        ("JOB_STATUS", "job_status"),
-        ("JOB_ID", "workflow_job_id"),
-        ("STARTED", "started_at"),
-        ("COMPLETED", "completed_at"),
+        ('ID', 'runner_id'),
+        ('STATE', 'status'),
+        ('JOB', 'job_status'),
+        ('STARTED', 'started_at'),
+        ('COMPLETED', 'completed_at'),
     ]
+    # color based on status
+    def style_state(val):
+        mapping = {'running':'green', 'waiting_for_job':'yellow', 'failed':'red', 'offline':'red'}
+        return click.style(val, fg=mapping.get(val.lower(), None))
+    stylers = {'status': style_state}
+    # convert epoch to readable
+    for item in items:
+        for key in ('started_at','completed_at'):
+            if key in item:
+                item[key] = datetime.fromtimestamp(int(item[key])).isoformat(' ')
 
-    def color_job_status(text: str) -> str:
-        raw = text.strip()
-        color = {
-            "running": "green",
-            "idle": "yellow",
-            "completed": "blue",
-        }.get(raw.lower())
-        return click.style(text, fg=color) if color else text
+    click.echo(format_table(items, columns, stylers))
 
-    def color_runner_status(text: str) -> str:
-        raw = text.strip()
-        color = {
-            "online": "green",
-            "offline": "red",
-        }.get(raw.lower())
-        return click.style(text, fg=color) if color else text
-
-    stylers = {"status": color_runner_status, "job_status": color_job_status}
-
-    click.echo(_format_table(items, columns, stylers))
-
-
-@runners.command("details")
-@click.argument("runner_id")
-def runner_details(runner_id):
-    """Show details for a specific runner."""
-    table = _get_table()
+@runners.command('details')
+@pass_ctx
+@click.argument('runner_id')
+def runner_details(ctx, runner_id):
+    """Show the raw DynamoDB record for a runner."""
+    table = get_dynamo_table(ctx.table_name, ctx.session)
     try:
-        resp = table.get_item(Key={"runner_id": runner_id})
+        resp = table.get_item(Key={'runner_id': runner_id})
     except ClientError as e:
-        raise click.ClickException(str(e))
-
-    item = resp.get("Item")
+        raise click.ClickException(f'DynamoDB get_item failed: {e}')
+    item = resp.get('Item')
     if not item:
-        raise click.ClickException("Runner not found")
+        raise click.ClickException('Runner not found')
+    click.echo(json.dumps(item, indent=2))
 
-    for key in sorted(item):
-        click.echo(f"{key}: {item[key]}")
-
-
-@runners.command("terminate")
-@click.argument("cluster_name")
-@click.argument("task_arn")
-def terminate_runner(cluster_name, task_arn):
-    """Terminate a runner ECS task."""
-    ecs = _ecs_client()
+@runners.command('terminate')
+@pass_ctx
+@click.option('--cluster', required=True, help='ECS cluster name')
+@click.argument('task_arn')
+def terminate_runner(ctx, task_arn, cluster):
+    """Stop a running ECS task by ARN."""
+    ecs = get_ecs_client(ctx.session)
     try:
-        ecs.stop_task(cluster=cluster_name, task=task_arn, reason="Stopped via ecsrunner-cli")
+        ecs.stop_task(cluster=cluster, task=task_arn, reason='Stopped via CLI')
     except ClientError as e:
-        raise click.ClickException(str(e))
-    click.echo("Termination initiated")
+        raise click.ClickException(f'ECS stop_task failed: {e}')
+    click.secho('Task termination initiated', fg='green')
 
-
-@runners.command("idle")
-@click.argument("runner_id")
-def mark_idle(runner_id):
-    """Mark runner as idle in DynamoDB."""
-    table = _get_table()
-    try:
-        table.update_item(
-            Key={"runner_id": runner_id},
-            UpdateExpression="SET #s = :online, #j = :idle REMOVE workflow_job_id, started_at, completed_at",
-            ExpressionAttributeNames={"#s": "status", "#j": "job_status"},
-            ExpressionAttributeValues={":idle": "idle", ":online": "online"},
-        )
-    except ClientError as e:
-        raise click.ClickException(str(e))
-    click.echo("Runner state updated to idle")
-
-
-@runners.command("exec")
-@click.argument("cluster_name")
-@click.argument("task_id")
-@click.option("--container", "container_name", help="Container name inside the task")
-@click.option("--cmd", default="/bin/bash", show_default=True, help="Command to execute")
-def exec_runner(cluster_name, task_id, container_name, cmd):
-    """Open an interactive shell into a running ECS task."""
-    if shutil.which("session-manager-plugin") is None:
-        raise click.ClickException(
-            "Session Manager plugin not found. "
-            "See https://docs.aws.amazon.com/console/systems-manager/session-manager-plugin-not-found"
-        )
-    command = [
-        "aws",
-        "ecs",
-        "execute-command",
-        "--cluster",
-        cluster_name,
-        "--task",
-        task_id,
-        "--command",
-        cmd,
-        "--interactive",
-    ]
-    if container_name:
-        command.extend(["--container", container_name])
-
-    try:
-        subprocess.run(command, check=True)
-    except subprocess.CalledProcessError as exc:
-        raise click.ClickException(f"Failed to exec into task: {exc}")
-
-
-# Cluster commands -------------------------------------------------------
-
+# ---- Cluster commands ----
 @cli.group()
 def cluster():
-    """Cluster level commands."""
+    """Cluster-level ECS commands."""
     pass
 
-
-@cluster.command("status")
-@click.argument("cluster_name")
-def cluster_status(cluster_name):
-    """Show ECS cluster task status."""
-    ecs = _ecs_client()
+@cluster.command('status')
+@pass_ctx
+@click.argument('cluster_name')
+def cluster_status(ctx, cluster_name):
+    """List tasks in an ECS cluster."""
+    ecs = get_ecs_client(ctx.session)
     try:
         resp = ecs.list_tasks(cluster=cluster_name)
-        arns = resp.get("taskArns", [])
+        arns = resp.get('taskArns', [])
         if not arns:
-            click.echo("No tasks found")
+            click.echo('No tasks found')
             return
         details = ecs.describe_tasks(cluster=cluster_name, tasks=arns)
-        tasks = [
-            {
-                "taskArn": t.get("taskArn"),
-                "lastStatus": t.get("lastStatus"),
-                "desiredStatus": t.get("desiredStatus"),
-            }
-            for t in details.get("tasks", [])
-        ]
+        tasks = [{'taskArn': t['taskArn'], 'status': t['lastStatus']} for t in details.get('tasks', [])]
     except ClientError as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(f'ECS describe_tasks failed: {e}')
+    click.echo(format_table(tasks, [('TASK', 'taskArn'), ('STATUS', 'status')]))
 
-    columns = [
-        ("TASK_ARN", "taskArn"),
-        ("DESIRED", "desiredStatus"),
-        ("LAST", "lastStatus"),
-    ]
-
-    def color_task_status(text: str) -> str:
-        raw = text.strip()
-        color = {
-            "running": "green",
-            "pending": "yellow",
-            "stopped": "red",
-        }.get(raw.lower())
-        return click.style(text, fg=color) if color else text
-
-    stylers = {"desiredStatus": color_task_status, "lastStatus": color_task_status}
-
-    click.echo(_format_table(tasks, columns, stylers))
-
-
-# Runs commands ----------------------------------------------------------
-
-@cli.group()
-def runs():
-    """Commands related to runner job history."""
-    pass
-
-
-@runs.command("list")
-@click.option("--runner-id", help="Filter by runner id")
-def list_runs(runner_id):
-    """List recorded workflow runs."""
-    table = _get_table()
-    items = []
-    try:
-        from boto3.dynamodb.conditions import Key, Attr
-
-        if runner_id:
-            resp = table.query(
-                KeyConditionExpression=Key("runner_id").eq(runner_id)
-                & Key("item_id").begins_with("run#")
-            )
-            items.extend(resp.get("Items", []))
-            while resp.get("LastEvaluatedKey"):
-                resp = table.query(
-                    KeyConditionExpression=Key("runner_id").eq(runner_id)
-                    & Key("item_id").begins_with("run#"),
-                    ExclusiveStartKey=resp["LastEvaluatedKey"],
-                )
-                items.extend(resp.get("Items", []))
-        else:
-            resp = table.scan(FilterExpression=Attr("item_id").begins_with("run#"))
-            items.extend(resp.get("Items", []))
-            while resp.get("LastEvaluatedKey"):
-                resp = table.scan(
-                    FilterExpression=Attr("item_id").begins_with("run#"),
-                    ExclusiveStartKey=resp["LastEvaluatedKey"],
-                )
-                items.extend(resp.get("Items", []))
-    except ClientError as e:
-        raise click.ClickException(str(e))
-
-    columns = [
-        ("RUNNER_ID", "runner_id"),
-        ("RUN_ID", "run_id"),
-        ("REPOSITORY", "repository"),
-        ("WORKFLOW", "workflow"),
-        ("JOB", "job"),
-        ("STARTED", "started_at"),
-        ("COMPLETED", "completed_at"),
-    ]
-
-    click.echo(_format_table(items, columns))
-
-
-if __name__ == "__main__":
+# ---- Entry point ----
+if __name__ == '__main__':
     cli()
