@@ -7,7 +7,7 @@ from typing import Any, List
 import boto3
 from botocore.config import Config as BotoConfig
 from pydantic_settings import BaseSettings
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     runner_image_tag: str = Field("latest", env="RUNNER_IMAGE_TAG")
     image_build_project: str | None = Field(None, env="IMAGE_BUILD_PROJECT")
 
-    @validator("subnets", "security_groups", pre=True)
+    @field_validator("subnets", "security_groups", mode="before")
     def _split_csv(cls, v: str | List[str]) -> List[str]:
         if isinstance(v, str):
             return [p for p in v.split(",") if p]
