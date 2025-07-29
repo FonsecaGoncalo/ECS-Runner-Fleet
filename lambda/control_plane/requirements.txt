@@ -1,0 +1,4 @@
+pydantic>=2.0
+pydantic_core>=2.0
+pydantic-settings>=2.10.1
+aws-lambda-powertools>=2.0

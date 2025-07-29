@@ -64,10 +64,14 @@ python ecsrunner_cli.py runs list --runner-id <runner_id>
 ## Getting started
 1. Install Terraform and configure AWS credentials.
 2. Create a `terraform.tfvars` file defining at minimum `github_pat`, `github_repo`, `webhook_secret`, `subnet_ids` and `security_groups`.
-3. Initialise and apply the module:
+3. Install the Python dependencies for the control plane Lambda:
+   ```bash
+   pip install -r lambda/control_plane/requirements.txt -t lambda/control_plane
+   ```
+4. Initialise and apply the module:
    ```bash
    terraform init
    terraform apply
    ```
-4. Configure the printed `webhook_url` as a GitHub webhook targeting `POST /webhook`.
+5. Configure the printed `webhook_url` as a GitHub webhook targeting `POST /webhook`.
 
