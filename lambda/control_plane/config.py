@@ -6,7 +6,7 @@ from typing import Any, List
 
 import boto3
 from botocore.config import Config as BotoConfig
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict, EnvSettingsSource
 from pydantic import Field, field_validator
 
 
@@ -35,9 +35,34 @@ class Settings(BaseSettings):
             return [p for p in v.split(",") if p]
         return v
 
-    class Config:
-        case_sensitive = False
-        env_file = ".env"
+    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        class NoJsonEnvSource(EnvSettingsSource):
+            def decode_complex_value(self, field_name, field, value):
+                return value
+
+        return (
+            init_settings,
+            NoJsonEnvSource(
+                settings_cls,
+                case_sensitive=env_settings.case_sensitive,
+                env_prefix=env_settings.env_prefix,
+                env_nested_delimiter=env_settings.env_nested_delimiter,
+                env_ignore_empty=env_settings.env_ignore_empty,
+                env_parse_none_str=env_settings.env_parse_none_str,
+            ),
+            dotenv_settings,
+            file_secret_settings,
+        )
 
 
 _session = boto3.Session()
