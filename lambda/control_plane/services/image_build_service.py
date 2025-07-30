@@ -24,6 +24,8 @@ class ImageBuildService:
         status = detail.get("status")
         runner_id = detail.get("runner_id")
 
+        self.logger.info(f"Detail: {detail}")
+        self.logger.info(f"runner_id: {detail}")
         self.logger.info(f"Build ID: {build_id}, Image URI: {image_uri}")
 
         if not image_uri:

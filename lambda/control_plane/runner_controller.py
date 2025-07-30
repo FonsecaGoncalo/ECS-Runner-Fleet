@@ -35,7 +35,7 @@ class RunnerController:
         )
 
         # Pre-calc repository name
-        self._repo_name = settings.ecr_repository_url.rsplit("/", 1)[-1]
+        self._repo_name = settings.runner_repository_url.rsplit("/", 1)[-1]
 
     def new_runner(
             self, labels: Iterable[str], base_image: str, class_name: str
@@ -95,7 +95,7 @@ class RunnerController:
                 repositoryName=self._repo_name,
                 imageIds=[{"imageTag": tag}],
             )
-            return f"{self.settings.ecr_repository_url}:{tag}"
+            return f"{self.settings.runner_repository_url}:{tag}"
         except self.ecr.exceptions.ImageNotFoundException:
             return None
         except ClientError as e:

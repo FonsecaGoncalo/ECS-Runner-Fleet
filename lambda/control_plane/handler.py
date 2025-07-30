@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from aws_lambda_powertools import Logger, Tracer
 
 from config import Settings
@@ -10,6 +12,8 @@ from services.webhook_service import WebhookService
 
 logger = Logger(service="control-plane")
 tracer = Tracer(service="control-plane")
+print("GITHUB_WEBHOOK_SECRET:", os.getenv("GITHUB_WEBHOOK_SECRET"))
+print("RUNNER_REPOSITORY_URL:", os.getenv("RUNNER_REPOSITORY_URL"))
 settings = Settings()
 
 status_service = StatusService(settings, logger, tracer)

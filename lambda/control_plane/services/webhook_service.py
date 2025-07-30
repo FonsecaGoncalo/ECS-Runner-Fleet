@@ -35,7 +35,7 @@ class WebhookService:
         if not signature:
             return {"statusCode": 401, "body": "missing signature"}
         if not verify_github_signature(
-                body_bytes, self.settings.webhook_secret, signature
+                body_bytes, self.settings.github_webhook_secret, signature
         ):
             return {"statusCode": 401, "body": "invalid signature"}
         try:

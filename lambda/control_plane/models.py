@@ -39,7 +39,6 @@ class Runner:
     def to_item(self) -> dict:
         item = {
             "runner_id": self.id,
-            "item_id": "state",
             "status": self.state,
             "timestamp": self.created_at,
         }
