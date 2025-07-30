@@ -82,7 +82,7 @@ class RunnerController:
         tag = img_utils.sanitize_image_label(runner.image)
         image_uri = self._resolve_image_uri(tag)
 
-        task_id = self._launch_runner_task(image_uri, runner.labels, runner.runner_class)
+        task_id = self._launch_runner_task(image_uri, runner.labels, tag,  runner.runner_class)
         runner.state = RunnerState.WAITING_FOR_JOB
         runner.task_id = task_id
         self.runner_store.save(runner)
@@ -155,20 +155,23 @@ class RunnerController:
         Run a Fargate task for the runner.
         Applies class-based CPU/memory overrides if available.
         """
+        logger.info(f"Launching runner task for {image_uri}, {labels}, {tag}, {class_name}")
         token = runner_utils.get_runner_token(self.settings)
         task_def = runner_utils.get_task_definition(self.settings, image_uri, tag)
+
+        logger.info(f"Task definition: {task_def}")
 
         container_env = [
             {"name": "RUNNER_REPOSITORY_URL", "value": f"https://github.com/{self.settings.github_repo}"},
             {"name": "RUNNER_TOKEN", "value": token},
-            {"name": "RUNNER_LABELS", "value": ",".join(labels)},
+            {"name": "RUNNER_LABELS", "value": labels},
             {"name": "RUNNER_NAME", "value": "runner"},
             {"name": "RUNNER_TABLE", "value": self.settings.runner_table},
         ]
         overrides: Dict[str, Any] = {"containerOverrides": [{"name": "runner", "environment": container_env}]}
 
         # Apply CPU/memory sizing for this runner class, if defined
-        sizes = get_class_sizes(self.settings)
+        sizes = get_class_sizes(self.settings.class_sizes_param)
         if class_name in sizes:
             cpu = sizes[class_name]["cpu"]
             memory = sizes[class_name]["memory"]

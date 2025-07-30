@@ -30,7 +30,7 @@ def get_runner_token(settings: Settings) -> str:
 
 
 def get_task_definition(
-    settings: Settings, image_uri: str, label: Optional[str] = None
+    settings: Settings, image_uri: str, label: str
 ) -> str:
     ecs = client("ecs")
     family = "github-runner"
@@ -101,7 +101,7 @@ def run_runner_task(
             }
         ]
     }
-    sizes = get_class_sizes(settings)
+    sizes = get_class_sizes(settings.class_sizes_param)
     if class_name in sizes:
         cpu = sizes[class_name].get("cpu")
         memory = sizes[class_name].get("memory")

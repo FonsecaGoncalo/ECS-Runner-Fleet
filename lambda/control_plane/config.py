@@ -53,10 +53,10 @@ def resource(service: str):
 
 
 @cache
-def get_class_sizes(settings: Settings) -> dict[str, Any]:
+def get_class_sizes(class_sizes_param: str | None) -> dict[str, Any]:
     """Fetch and cache runner class size definitions from SSM."""
-    if not settings.class_sizes_param:
+    if not class_sizes_param:
         return {}
     ssm_client = client("ssm")
-    resp = ssm_client.get_parameter(Name=settings.class_sizes_param)
+    resp = ssm_client.get_parameter(Name=class_sizes_param)
     return json.loads(resp["Parameter"]["Value"])
