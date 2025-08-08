@@ -1,77 +1,205 @@
+# AWS Runner Fleet
+
 <div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="/assets/img.png">
-  <img alt="aws-runner-fleet logo" src="/assets/img.png" width="25%" height="25%">
-</picture>
-
-**AWS Runner Fleet**
+  <img alt="AWS Runner Fleet logo" src="/assets/img.png" width="25%" height="25%">
 </div>
+
+**Ephemeral GitHub Actions runners on AWS ECS Fargate — launched on demand, scaled automatically, and shut down when jobs finish.**
 
 ---
 
-ECS Runner Fleet provides ephemeral GitHub Actions self-hosted runners powered by AWS ECS Fargate. Runners are launched on-demand in response to workflow events, allowing teams to scale builds automatically while keeping isolation and cost under control.
+## Overview
+
+**AWS Runner Fleet** provisions self-hosted GitHub Actions runners as **ephemeral ECS Fargate tasks**.
+The control plane reacts to GitHub workflow events, launches runners only when needed, and stops them automatically once the job is complete — providing **isolation, scalability, and cost efficiency**.
+
 
 ## Architecture
-The solution is composed of two main parts:
 
-1. **Control plane** – A Lambda function orchestrated through API Gateway and EventBridge. It validates GitHub webhooks, fetches runner tokens and starts ECS tasks. Runner status updates are stored in DynamoDB.
-2. **ECS fleet** – An ECS cluster, IAM roles and an ECR repository where runner containers execute jobs. Task definitions are registered on demand by the control plane and images can be built lazily using `image:` labels.
+The system consists of two main components:
 
-The event flow is:
+### 1. Control Plane
 
-- GitHub sends a `workflow_job` webhook when a job is queued.
-- API Gateway forwards the event to EventBridge which triggers the control plane Lambda.
-- Lambda launches a Fargate task that registers as a runner. When the job finishes the task stops and emits a status event.
+A **Lambda function** behind **API Gateway** and **EventBridge**:
 
-## Terraform module
-All infrastructure is defined as a Terraform module consisting of two sub-modules: `ecs-fleet` and `control-plane`. The module exposes several inputs to customise the deployment:
+* Validates GitHub webhook signatures.
+* Requests short-lived runner registration tokens.
+* Starts ECS Fargate tasks for queued jobs.
+* Updates runner status in DynamoDB.
+* Optionally triggers CodeBuild for on-the-fly runner image builds.
 
-| Variable | Description |
-|----------|-------------|
-| `aws_region` | AWS region for resources |
-| `github_pat` | Personal access token used to register runners |
-| `github_repo` | Repository owning the runners (`owner/repo`) |
-| `webhook_secret` | Secret used to validate GitHub webhooks |
-| `subnet_ids` | Subnets where Fargate tasks run |
-| `security_groups` | Security groups for the tasks |
-| `runner_image_tag` | Tag for the base runner Docker image |
-| `runner_class_sizes` | Map of runner "class" names to CPU and memory settings |
-| `event_bus_name` | Name of the EventBridge bus |
-| `image_build_project` | Optional name of a CodeBuild project used for dynamic image builds |
+### 2. ECS Fleet
 
-The module outputs the webhook URL for GitHub and additional resource identifiers.
+An **ECS cluster** with:
 
-If `image_build_project` is set the module also provisions a CodeBuild project with that name.
-Jobs can then use labels of the form `image:<base-image>`. When such a job is queued
-the control plane triggers the project to build a runner image using [`runner/Dockerfile`](runner/Dockerfile)
-but replacing its `FROM` statement with `<base-image>`. After the build completes a temporary
-task definition is registered with the new image to run the workflow. Subsequent jobs reuse the built image if it exists in ECR.
+* IAM roles for execution and runner tasks.
+* ECR repository for runner images.
+* CloudWatch logging.
+* Optional CodeBuild project for dynamic image builds from `image:<base>` labels.
 
-Example usage can be found under [`examples/ecs-fleet-example`](examples/ecs-fleet-example).
+---
 
-## CLI tool
-`ecsrunner_cli.py` offers convenience commands to inspect running tasks and stored runner data. Set `RUNNER_STATE_TABLE` and `CLASS_SIZES_PARAM` to point at the DynamoDB table and SSM parameter created by the module.
+### Event Flow Diagram
 
+```mermaid
+sequenceDiagram
+    participant GitHub
+    participant API Gateway
+    participant EventBridge
+    participant Lambda (Control Plane)
+    participant ECS Fargate
+    participant DynamoDB
+    participant CodeBuild
+
+    GitHub->>API Gateway: workflow_job webhook
+    API Gateway->>EventBridge: Forward event
+    EventBridge->>Lambda (Control Plane): Trigger
+    Lambda (Control Plane)->>GitHub: Request runner token
+    alt Image label present
+        Lambda (Control Plane)->>CodeBuild: Start image build
+        CodeBuild-->>Lambda (Control Plane): Build complete
+    end
+    Lambda (Control Plane)->>ECS Fargate: Launch task with token
+    ECS Fargate->>GitHub: Register as runner
+    ECS Fargate-->>GitHub: Run job
+    ECS Fargate->>EventBridge: Status update
+    EventBridge->>Lambda (Control Plane): Trigger update
+    Lambda (Control Plane)->>DynamoDB: Save status
 ```
+
+---
+
+## Terraform Module
+
+All infrastructure is defined in a single Terraform module, composed of:
+
+* `ecs-fleet` — ECS cluster, IAM roles, ECR repo, CloudWatch logs.
+* `control-plane` — Lambda orchestration, EventBridge rules, API Gateway.
+* (Optional) `image-build-project` — CodeBuild for dynamic runner images.
+
+### Core Variables
+
+| Variable              | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `aws_region`          | AWS region for all resources                    |
+| `github_pat`          | GitHub PAT for registering runners              |
+| `github_repo`         | Repository (`owner/repo`) owning the runners    |
+| `webhook_secret`      | Secret for validating GitHub webhooks           |
+| `subnet_ids`          | Subnets for Fargate tasks                       |
+| `security_groups`     | Security groups for the tasks                   |
+| `runner_image_tag`    | Base tag for the runner Docker image            |
+| `runner_class_sizes`  | Map of runner sizes (`cpu`, `memory`)           |
+| `event_bus_name`      | EventBridge bus name                            |
+| `image_build_project` | (Optional) CodeBuild project for dynamic builds |
+
+**Outputs include:**
+
+* Webhook URL for GitHub.
+* DynamoDB table name.
+* ECS, ECR, and IAM resource ARNs.
+
+---
+
+## Dynamic Images
+
+If `image_build_project` is set, jobs can use:
+
+```yaml
+runs-on: [self-hosted, image:ubuntu:22.04]
+```
+
+The control plane will:
+
+1. Trigger CodeBuild to build a runner image using [`runner/Dockerfile`](runner/Dockerfile) with the specified base image.
+2. Push the image to ECR.
+3. Launch a runner task with the built image.
+
+Subsequent jobs reuse the image if it exists.
+
+---
+
+## CLI Tool
+
+The included CLI (`ecsrunner_cli.py`) lets you inspect runners and class sizes.
+
+Set:
+
+```bash
+export RUNNER_TABLE=<dynamodb_table_name>
+export CLASS_SIZES_PARAM=<ssm_param_name>
+```
+
+### Examples:
+
+```bash
+# List all runners
 python ecsrunner_cli.py runners list
+
+# Show runner details
 python ecsrunner_cli.py runners details <runner_id>
-python ecsrunner_cli.py cluster status <cluster>
+
+# Terminate a runner by ID
+python ecsrunner_cli.py runners terminate <runner_id>
+
+# Show class sizes from SSM
 python ecsrunner_cli.py list-class-sizes
-python ecsrunner_cli.py runs list --runner-id <runner_id>
 ```
 
-## Getting started
-1. Install Terraform and configure AWS credentials.
-2. Create a `terraform.tfvars` file defining at minimum `github_pat`, `github_repo`, `webhook_secret`, `subnet_ids` and `security_groups`.
-3. Install the Python dependencies for the control plane Lambda:
-   ```bash
-   pip install -r lambda/control_plane/requirements.txt -t lambda/control_plane
-   ```
-4. Initialise and apply the module:
-   ```bash
-   terraform init
-   terraform apply
-   ```
-5. Configure the printed `webhook_url` as a GitHub webhook targeting `POST /webhook`.
+---
+
+## Getting Started
+
+### 1. Install prerequisites
+
+* [Terraform](https://developer.hashicorp.com/terraform/downloads)
+* AWS CLI with credentials configured.
+* Python 3.9+.
+
+### 2. Define Terraform variables
+
+Create `terraform.tfvars` with at least:
+
+```hcl
+github_pat       = "ghp_..."
+github_repo      = "owner/repo"
+webhook_secret   = "super-secret"
+subnet_ids       = ["subnet-123", "subnet-456"]
+security_groups  = ["sg-123456"]
+runner_image_tag = "latest"
+```
+
+### 3. Install Lambda dependencies
+
+```bash
+pip install -r lambda/control_plane/requirements.txt -t lambda/control_plane
+```
+
+### 4. Deploy infrastructure
+
+```bash
+terraform init
+terraform apply
+```
+
+### 5. Configure GitHub webhook
+
+* Use the `webhook_url` output from Terraform.
+* Event type: `workflow_job`.
+* Method: `POST /webhook`.
+
+---
+
+## Example Workflow
+
+```yaml
+jobs:
+  build:
+    runs-on: [self-hosted, class:medium, image:ubuntu:22.04]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y make
+      - name: Run tests
+        run: make test
+```
 
