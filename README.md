@@ -155,17 +155,38 @@ python ecsrunner_cli.py list-class-sizes
 * AWS CLI with credentials configured.
 * Python 3.9+.
 
-### 2. Define Terraform variables
+### 2. Define Terraform module
 
-Create `terraform.tfvars` with at least:
+Create `ecs-fleet.tf` with:
 
 ```hcl
-github_pat       = "ghp_..."
-github_repo      = "owner/repo"
-webhook_secret   = "super-secret"
-subnet_ids       = ["subnet-123", "subnet-456"]
-security_groups  = ["sg-123456"]
-runner_image_tag = "latest"
+module "ecs-fleet" {
+  source = "./../.." # path to this module
+
+  github_pat  = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  github_repo = "your-github-org/your-repo"
+
+  subnet_ids      = module.vpc.public_subnets
+  security_groups = [aws_security_group.ecs_tasks_sg.id]
+  webhook_secret  = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+  image_build_project = "image_builder"
+
+  runner_class_sizes = {
+    small = {
+      cpu    = 512
+      memory = 1024
+    }
+    medium = {
+      cpu    = 1024
+      memory = 2048
+    }
+    large = {
+      cpu    = 2048
+      memory = 4096
+    }
+  }
+}
 ```
 
 ### 3. Install Lambda dependencies
