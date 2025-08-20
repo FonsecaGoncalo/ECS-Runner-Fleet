@@ -1,7 +1,7 @@
-# AWS Runner Fleet
-
 <div align="center">
   <img alt="AWS Runner Fleet logo" src="/assets/img.png" width="25%" height="25%">
+
+  **AWS Runner Fleet** — Ephemeral GitHub Actions runners on AWS
 </div>
 
 
