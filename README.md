@@ -4,7 +4,6 @@
   <img alt="AWS Runner Fleet logo" src="/assets/img.png" width="25%" height="25%">
 </div>
 
-**Ephemeral GitHub Actions runners on AWS ECS Fargate — launched on demand, scaled automatically, and shut down when jobs finish.**
 
 ---
 
