@@ -39,7 +39,7 @@ class Runner:
     def to_item(self) -> dict:
         item = {
             "runner_id": self.id,
-            "status": self.state,
+            "status": self.state.value if isinstance(self.state, RunnerState) else self.state,
             "timestamp": self.created_at,
         }
         if self.labels:
@@ -64,9 +64,14 @@ class Runner:
 
     @classmethod
     def from_item(cls, item: dict) -> "Runner":
+        state_val = item.get("status")
+        try:
+            state = RunnerState(state_val) if state_val is not None else RunnerState.OFFLINE
+        except ValueError:
+            state = RunnerState.OFFLINE
         return cls(
             id=item.get("runner_id"),
-            state=item.get("status"),
+            state=state,
             labels=item.get("runner_labels", ""),
             image=item.get("image_tag"),
             created_at=item.get("timestamp", int(time.time())),

@@ -38,7 +38,7 @@ class RunnerController:
         self._repo_name = settings.runner_repository_url.rsplit("/", 1)[-1]
 
     def new_runner(
-            self, labels: Iterable[str], base_image: str, class_name: str
+            self, labels: str, base_image: str, class_name: str | None
     ) -> Runner:
         """
         Create a new Runner record and either:
@@ -81,8 +81,10 @@ class RunnerController:
 
         tag = img_utils.sanitize_image_label(runner.image)
         image_uri = self._resolve_image_uri(tag)
+        if image_uri is None:
+            raise RuntimeError(f"Image for tag {tag} not found in ECR")
 
-        task_id = self._launch_runner_task(image_uri, runner.labels, tag,  runner.runner_class)
+        task_id = self._launch_runner_task(image_uri, runner.labels, tag, runner.runner_class)
         runner.state = RunnerState.WAITING_FOR_JOB
         runner.task_id = task_id
         self.runner_store.save(runner)
@@ -104,27 +106,35 @@ class RunnerController:
 
     def update_runner_state(self, runner_id: str, state: RunnerState) -> Runner:
         runner = self.runner_store.get_runner(runner_id)
+        if runner is None:
+            raise RuntimeError(f"Runner {runner_id} not found")
         runner.state = state
         self.runner_store.save(runner)
         return runner
 
-    def terminate_runner(self, runner_id: str) -> Runner:
+    def terminate_runner(self, runner_id: str) -> Optional[Runner]:
         runner = self.runner_store.get_runner(runner_id)
+        if runner is None:
+            logger.warning("Runner %s not found when terminating", runner_id)
+            return None
         task_id = runner.task_id
 
         try:
-            self.ecs.stop_task(
-                cluster=self.settings.cluster,
-                task=task_id,
-                reason="Runner job completed",
-            )
-
+            if task_id:
+                self.ecs.stop_task(
+                    cluster=self.settings.cluster,
+                    task=task_id,
+                    reason="Runner job completed",
+                )
             runner.state = RunnerState.OFFLINE
+            self.runner_store.save(runner)
+            return runner
         except Exception as exc:  # pragma: no cover - logging only
             logger.exception(
                 "Failed to stop task",
                 extra={"task_id": task_id, "error": str(exc)},
             )
+            return runner
 
     def _build_image_async(self, base_image: str, tag: str, runner_id: str) -> None:
         """Kick off a CodeBuild project to build & push a new runner image."""
@@ -147,7 +157,7 @@ class RunnerController:
     def _launch_runner_task(
             self,
             image_uri: str,
-            labels: Iterable[str],
+            labels: str,
             tag: str,
             class_name: Optional[str] = None,
     ) -> str:

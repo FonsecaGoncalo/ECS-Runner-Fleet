@@ -25,11 +25,15 @@ class ImageBuildService:
         runner_id = detail.get("runner_id")
 
         self.logger.info(f"Detail: {detail}")
-        self.logger.info(f"runner_id: {detail}")
+        self.logger.info(f"runner_id: {runner_id}")
         self.logger.info(f"Build ID: {build_id}, Image URI: {image_uri}")
 
+        if not runner_id:
+            return {"statusCode": 400, "body": "missing runner id"}
         if not image_uri:
-            return {"statusCode": 400, "body": "runner id"}
+            # Build did not produce image URI; treat as failure unless status says otherwise
+            self.runner_controller.mark_runner_as_failed(runner_id)
+            return {"statusCode": 400, "body": "missing image uri"}
 
         if status != "SUCCEEDED":
             self.runner_controller.mark_runner_as_failed(runner_id)

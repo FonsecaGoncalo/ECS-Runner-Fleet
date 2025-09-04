@@ -31,11 +31,14 @@ class WebhookService:
         else:
             body_bytes = body.encode()
             body_str = body
-        signature = event.get("headers", {}).get("x-hub-signature-256")
+        headers = event.get("headers", {}) or {}
+        signature = (
+            headers.get("x-hub-signature-256") or headers.get("X-Hub-Signature-256")
+        )
         if not signature:
             return {"statusCode": 401, "body": "missing signature"}
         if not verify_github_signature(
-                body_bytes, self.settings.github_webhook_secret, signature
+                body_bytes, self.settings.github_webhook_secret, signature.strip()
         ):
             return {"statusCode": 401, "body": "invalid signature"}
         try:
