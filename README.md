@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="AWS Runner Fleet logo" src="/assets/img.png" width="25%" height="25%">
+  <img alt="AWS Runner Fleet logo" src="/assets/img.png" width="20%" height="20%">
 
   **AWS Runner Fleet** — Ephemeral GitHub Actions runners on AWS
 </div>
@@ -14,6 +14,9 @@ The control plane reacts to GitHub workflow events, launches runners only when n
 
 
 ## Architecture
+<div align="center">
+    <img alt="arch" src="/assets/arch.png" width="60%" height="60%">
+</div>
 
 The system consists of two main components:
 
@@ -44,13 +47,6 @@ An **ECS cluster** with:
 * ECR repository for runner images.
 * CloudWatch logging.
 * Optional CodeBuild project for dynamic image builds from `image:<base>` labels.
-
----
-
-### Architecture Diagram
-<div align="center">
-    <img alt="arch" src="/assets/arch.png" width="50%" height="50%">
-</div>
 
 ---
 
