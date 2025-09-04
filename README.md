@@ -47,6 +47,11 @@ An **ECS cluster** with:
 
 ---
 
+### Architecture Diagram
+![img](./assets/arch.png)
+
+---
+
 ### Event Flow Diagram
 
 ```mermaid
@@ -73,6 +78,27 @@ sequenceDiagram
     ECS Fargate->>EventBridge: Status update
     EventBridge->>Lambda (Control Plane): Trigger update
     Lambda (Control Plane)->>DynamoDB: Save status
+```
+
+### Janitor Cleanup Flow
+
+```mermaid
+sequenceDiagram
+    participant EB as EventBridge
+    participant J as Janitor Lambda
+    participant D as DynamoDB
+    participant E as ECS
+
+    EB->>J: Scheduled trigger (rate/cron)
+    J->>D: Scan runners table
+    loop For each runner older than TTL
+        alt Has task_id
+            J->>E: stop_task(task_id)
+            J->>D: Mark state (FAILED if active, else OFFLINE)
+        else No task
+            J->>D: Mark OFFLINE/FAILED accordingly
+        end
+    end
 ```
 
 ---
