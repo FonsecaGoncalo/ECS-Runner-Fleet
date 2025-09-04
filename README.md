@@ -19,13 +19,22 @@ The system consists of two main components:
 
 ### 1. Control Plane
 
-A **Lambda function** behind **API Gateway** and **EventBridge**:
+- **Lambda function** behind **API Gateway** and **EventBridge**:
 
-* Validates GitHub webhook signatures.
-* Requests short-lived runner registration tokens.
-* Starts ECS Fargate tasks for queued jobs.
-* Updates runner status in DynamoDB.
-* Optionally triggers CodeBuild for on-the-fly runner image builds.
+  * Validates GitHub webhook signatures.
+  * Requests short-lived runner registration tokens.
+  * Starts ECS Fargate tasks for queued jobs.
+  * Updates runner status in DynamoDB.
+  * Optionally triggers CodeBuild for on-the-fly runner image builds.
+
+- A scheduled Lambda ("Janitor") periodically scans the runner table and:
+  - Stops orphaned ECS tasks and marks runners `OFFLINE`.
+  - Fails and cleans up runners stuck in `IMAGE_CREATING`, `STARTING`, or `WAITING_FOR_JOB` beyond a timeout.
+  
+  Configure via Terraform variables:
+  
+  - `runner_ttl_seconds` (default: 7200) — global timeout to clean up any runner.
+  - `janitor_schedule_expression` (default: `rate(5 minutes)`) — EventBridge schedule.
 
 ### 2. ECS Fleet
 
@@ -67,6 +76,17 @@ sequenceDiagram
 ```
 
 ---
+
+## Runner Lifecycle
+
+- STARTING: created in DynamoDB; awaiting image/task launch.
+- IMAGE_CREATING: CodeBuild building a custom image for requested `image:` label.
+- WAITING_FOR_JOB: ECS task started; runner registered; waiting for job assignment.
+- RUNNING: runner executing a job.
+- OFFLINE: task stopped and runner is no longer available.
+- FAILED: terminal error (image build failed, task launch failed, or exceeded TTL).
+
+Transitions are persisted in DynamoDB under `status` with timestamps. The Janitor enforces timeouts.
 
 ## Terraform Module
 
@@ -114,6 +134,31 @@ The control plane will:
 3. Launch a runner task with the built image.
 
 Subsequent jobs reuse the image if it exists.
+
+### Labels
+
+- Required base: `self-hosted`
+- Image selection: `image:<base>`, e.g. `image:ubuntu:22.04` or `image:ghcr.io/org/image:tag`
+- Class sizing: `class:<name>`, e.g. `class:medium` (maps CPU/memory overrides)
+
+Examples:
+
+```yaml
+runs-on: [self-hosted, image:ubuntu:22.04, class:medium]
+runs-on: [self-hosted, image:public.ecr.aws/docker/library/node:20, class:large]
+```
+
+### Class Sizes (SSM format)
+
+Store CPU/memory overrides as a JSON string in SSM (the module wires the parameter ARN):
+
+```json
+{
+  "small":  { "cpu": 512,  "memory": 1024 },
+  "medium": { "cpu": 1024, "memory": 2048 },
+  "large":  { "cpu": 2048, "memory": 4096 }
+}
+```
 
 ---
 
@@ -222,4 +267,3 @@ jobs:
       - name: Run tests
         run: make test
 ```
-
