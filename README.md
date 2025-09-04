@@ -48,7 +48,9 @@ An **ECS cluster** with:
 ---
 
 ### Architecture Diagram
-![img](./assets/arch.png)
+<div align="center">
+    <img alt="arch" src="/assets/arch.png" width="50%" height="50%">
+</div>
 
 ---
 
