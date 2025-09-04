@@ -1,12 +1,13 @@
 import logging
-from typing import Optional, Dict, Any, Iterable
+import os
+from typing import Optional, Dict, Any
 
 from botocore.exceptions import ClientError
 
 from models import Runner, RunnerState
 from config import Settings, client, get_class_sizes
 from store.runner_store import RunnerStore
-from utilities import images as img_utils, runner as runner_utils
+from utilities import images as img_utils, github as gh_utils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -166,8 +167,8 @@ class RunnerController:
         Applies class-based CPU/memory overrides if available.
         """
         logger.info(f"Launching runner task for {image_uri}, {labels}, {tag}, {class_name}")
-        token = runner_utils.get_runner_token(self.settings)
-        task_def = runner_utils.get_task_definition(self.settings, image_uri, tag)
+        token = gh_utils.get_runner_token(self.settings)
+        task_def = self._get_or_register_task_definition(image_uri, tag)
 
         logger.info(f"Task definition: {task_def}")
 
@@ -213,3 +214,45 @@ class RunnerController:
         task_arn = tasks[0]["taskArn"]
         task_id = task_arn.split("/")[-1]
         return task_id
+
+    def _get_or_register_task_definition(self, image_uri: str, label: str) -> str:
+        """Describe existing task def by family, or register a new one."""
+        family = "github-runner"
+        if label:
+            family = f"{family}-{img_utils.sanitize_image_label(label)}"
+        try:
+            resp = self.ecs.describe_task_definition(taskDefinition=family)
+            return resp["taskDefinition"]["taskDefinitionArn"]
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "ClientException":
+                raise
+        container = {
+            "name": "runner",
+            "image": image_uri,
+            "cpu": 1024,
+            "memory": 2048,
+            "essential": True,
+            "environment": [
+                {"name": "GITHUB_REPO", "value": self.settings.github_repo},
+                {"name": "EVENT_BUS_NAME", "value": self.settings.event_bus_name or ""},
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": self.settings.log_group_name,
+                    "awslogs-region": os.environ.get("AWS_REGION", "us-east-1"),
+                    "awslogs-stream-prefix": "runner",
+                },
+            },
+        }
+        resp = self.ecs.register_task_definition(
+            family=family,
+            networkMode="awsvpc",
+            executionRoleArn=self.settings.execution_role_arn,
+            taskRoleArn=self.settings.task_role_arn,
+            requiresCompatibilities=["FARGATE"],
+            cpu="1024",
+            memory="2048",
+            containerDefinitions=[container],
+        )
+        return resp["taskDefinition"]["taskDefinitionArn"]

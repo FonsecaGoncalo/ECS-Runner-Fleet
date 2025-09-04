@@ -9,7 +9,7 @@ from aws_lambda_powertools import Logger, Tracer
 from config import Settings
 from models import RunnerState
 from runner_controller import RunnerController
-from utilities.signature import verify_github_signature
+from utilities.github import verify_github_signature
 
 
 class WebhookService:

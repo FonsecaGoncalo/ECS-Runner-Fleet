@@ -16,7 +16,6 @@ class ImageBuildService:
         self.logger = logger
         self.tracer = tracer
         self.runner_controller = RunnerController(settings)
-        self.table = resource("dynamodb").Table(settings.runner_table)
 
     def handle_event(self, detail: Dict[str, Any]) -> Dict[str, Any]:
         build_id = detail.get("build_id")

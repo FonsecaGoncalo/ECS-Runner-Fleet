@@ -176,8 +176,55 @@ resource "aws_lambda_function" "control_plane" {
       TASK_ROLE_ARN         = var.task_role_arn
       LOG_GROUP_NAME        = var.log_group_name
       EVENT_BUS_NAME        = var.event_bus_name
+      RUNNER_TTL_SECONDS    = var.runner_ttl_seconds
     }
   }
+}
+
+resource "aws_lambda_function" "janitor" {
+  filename         = data.archive_file.lambda_zip.output_path
+  function_name    = "runner-janitor"
+  role             = aws_iam_role.lambda.arn
+  handler          = "janitor.lambda_handler"
+  runtime          = "python3.12"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  environment {
+    variables = {
+      CLUSTER               = var.ecs_cluster
+      SUBNETS = join(",", var.ecs_subnet_ids)
+      SECURITY_GROUPS = join(",", var.security_groups)
+      GITHUB_PAT            = var.github_pat
+      GITHUB_REPO           = var.github_repo
+      RUNNER_TABLE          = aws_dynamodb_table.runner_status.name
+      CLASS_SIZES_PARAM     = aws_ssm_parameter.class_sizes.name
+      RUNNER_REPOSITORY_URL = var.runner_repository_url
+      EXECUTION_ROLE_ARN    = var.execution_role_arn
+      TASK_ROLE_ARN         = var.task_role_arn
+      LOG_GROUP_NAME        = var.log_group_name
+      EVENT_BUS_NAME        = var.event_bus_name
+      RUNNER_TTL_SECONDS    = var.runner_ttl_seconds
+    }
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "janitor" {
+  name                = "runner-janitor"
+  schedule_expression = var.janitor_schedule_expression
+}
+
+resource "aws_cloudwatch_event_target" "janitor" {
+  rule      = aws_cloudwatch_event_rule.janitor.name
+  target_id = "runner-janitor"
+  arn       = aws_lambda_function.janitor.arn
+}
+
+resource "aws_lambda_permission" "allow_janitor_events" {
+  statement_id  = "AllowEventBridgeInvokeJanitor"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.janitor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.janitor.arn
 }
 
 resource "aws_apigatewayv2_api" "webhook_api" {

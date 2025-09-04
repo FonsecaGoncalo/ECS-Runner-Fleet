@@ -78,3 +78,15 @@ variable "log_group_name" {
   description = "CloudWatch log group name for runner tasks"
   type        = string
 }
+
+variable "runner_ttl_seconds" {
+  description = "Time in seconds after which any runner is cleaned up by the janitor"
+  type        = number
+  default     = 7200
+}
+
+variable "janitor_schedule_expression" {
+  description = "EventBridge schedule expression for the janitor (e.g., rate(5 minutes), cron(...))"
+  type        = string
+  default     = "rate(5 minutes)"
+}

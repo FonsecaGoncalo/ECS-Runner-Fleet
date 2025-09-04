@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     runner_repository_url: str = Field(..., env="RUNNER_REPOSITORY_URL")
     runner_image_tag: str = Field("latest", env="RUNNER_IMAGE_TAG")
     image_build_project: str | None = Field(None, env="IMAGE_BUILD_PROJECT")
+    runner_ttl_seconds: int = Field(7200, env="RUNNER_TTL_SECONDS")
 
     @field_validator("subnets", "security_groups", mode="before")
     @classmethod
